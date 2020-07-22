@@ -12,7 +12,7 @@ public class ImprovedMatrixEncoder<E> implements MatrixEncoder<E> {
   private MemoryController controller;
   private MemoryController.MemoryBitOutputStream writer;
   private int refSize, dataSize, headerSize;
-  private int bitsPerData, longestX, lastData;
+  private int bitsPerData, longestX;
 
   public ImprovedMatrixEncoder(E[][] m, int bitsPerData, BiFunction<E,Integer,byte[]> e, BiFunction<byte[],Integer,E> d){
     matrix = m;
@@ -95,7 +95,6 @@ public class ImprovedMatrixEncoder<E> implements MatrixEncoder<E> {
     headerSize=8+bitsPerData+5+heightBits+5+widthBits;
     if((longestX>1||matrix.length>1)&&dataSize>0){
       writer.writeBit(true);
-      lastData = controller.size();
       encodeHelper(0, 0, matrix.length, longestX);
       //controller.delete(lastData,controller.size());
     }else{
@@ -124,7 +123,6 @@ public class ImprovedMatrixEncoder<E> implements MatrixEncoder<E> {
       }
       writer.writeBit(true);
       writer.writeBits(bitsPerData,item,encoder);
-      lastData = controller.size();
       return true;
     }else{
       int nyLen = yLen/2, yDif = yLen-nyLen;
