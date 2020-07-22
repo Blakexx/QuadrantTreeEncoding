@@ -434,7 +434,7 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         }
 
         public boolean hasNext(){
-            return point.row<cache.length&&point.column<cache[point.row].length;
+            return point.row<dimensions.row&&point.column<dimensions.column&&point.column>-1&&point.row>-1;
         }
 
         public DataPoint<V> next(){
