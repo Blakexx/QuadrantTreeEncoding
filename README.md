@@ -1,11 +1,11 @@
 # QuadrantTreeEncoding
  A matrix encoding scheme seeking to improve on space efficiency and access locality
 
-##Running
+## Running
 
 In order to run this project, run the Main.java file with Java 14.
 
-###Running Options
+### Running Options
 
 When run, you are presented with three options in the console.
 
