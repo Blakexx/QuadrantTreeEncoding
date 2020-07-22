@@ -105,7 +105,7 @@ class Main {
       tempString.append("\n");
       data.append(tempString);
     }
-    PrintWriter pw = new PrintWriter(new File("data2.txt"));
+    PrintWriter pw = new PrintWriter(new File("runtimeData.txt"));
     pw.write(data.toString());
     pw.flush();
   }
@@ -359,7 +359,7 @@ class Main {
         data.append(str);
       }
     }
-    PrintWriter pw = new PrintWriter(new File("data.txt"));
+    PrintWriter pw = new PrintWriter(new File("diskData.txt"));
     pw.write(data.toString());
     pw.flush();
   }
