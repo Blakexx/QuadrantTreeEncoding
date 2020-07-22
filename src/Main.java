@@ -215,6 +215,7 @@ class Main {
     failCount = 0;
     timeData[0]/=readCount;
     printProgressBar("Stride-1 reads",0,1,doPrint);
+    readCount = 0;
     iterator = matrix.genericIterator(0,0,(point, dimensions)->{
       point.column++;
       if(point.column==dimensions.column){
@@ -222,7 +223,6 @@ class Main {
         point.row++;
       }
     });
-    readCount = 0;
     while(iterator.hasNext()){
       nanoTime = System.nanoTime();
       DataPoint<Byte> point = iterator.next();

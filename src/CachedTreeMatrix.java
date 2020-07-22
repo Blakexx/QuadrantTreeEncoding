@@ -2,6 +2,7 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.ListIterator;
+import java.util.NoSuchElementException;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 
@@ -379,6 +380,9 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         }
 
         public DataPoint<V> next(){
+            if(!hasNext()){
+                throw new NoSuchElementException("Iterator has no more elements");
+            }
             MemoryController data = matrix.encodedMatrix;
             StackFrame current = frames.getLast();
             while(true){
@@ -434,6 +438,9 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         }
 
         public DataPoint<V> next(){
+            if(!hasNext()){
+                throw new NoSuchElementException("Iterator has no more elements");
+            }
             int currentR = point.row, currentC = point.column;
             V data = (V)cache[currentR][currentC];
             if(data==null){
