@@ -440,7 +440,7 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
                 while(treeIterator.hasNext()){
                     DataPoint<V> dataPoint = treeIterator.next();
                     cache[dataPoint.row][dataPoint.column] = dataPoint.data;
-                    if(point.row==currentR&&point.column==currentC){
+                    if(dataPoint.row==currentR&&dataPoint.column==currentC){
                         data = dataPoint.data;
                         break;
                     }
