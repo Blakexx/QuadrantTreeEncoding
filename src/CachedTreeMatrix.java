@@ -65,8 +65,6 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         if(data==null||r<0||c<0||r>=height()||c>=width()){
             throw new IllegalArgumentException("Invalid parameters");
         }
-        //System.out.println(encodedMatrix);
-        //System.out.println("\nWRITING "+r+" "+c+" "+data+"\n");
         //printBits();
         Pair<StackFrame,Integer> frameInfo = decodeUntil(r,c,getClosestIndexFromCache(r,c));
         int dataIndex = frameInfo.value;
@@ -90,21 +88,15 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
             }
         }else{
             if(encodedMatrix.getBit(dataIndex)){
-                //System.out.println(encodedMatrix);
-                //System.out.println(cacheQueue);
                 int removed = bitsPerData();
                 int deleteStart = dataIndex+1, deleteEnd = dataIndex+bitsPerData()+1;
-                //System.out.println(baseFrame);
                 while(baseFrame.parent!=null){
                     baseFrame = baseFrame.parent;
                     int ignoreIndex = cacheQueue.getLast().value;
-                    //System.out.println(ignoreIndex);
                     if(!hasData(baseFrame,ignoreIndex,removed,dataIndex-=ignoreIndex)){
-                        //System.out.println("NO HAS DATA?");
                         int children = baseFrame.xLen==1||baseFrame.yLen==1?2:4;
                         deleteStart = Math.min(dataIndex+1,deleteStart);
                         deleteEnd = Math.max(dataIndex+1+removed+children,deleteEnd);
-                        //System.out.println(deleteStart+" "+deleteEnd);
                         while(cacheQueue.getLast().key.parent==baseFrame){
                             cacheQueue.removeLast();
                         }
@@ -121,7 +113,6 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
                 }
                 encodedMatrix.delete(deleteStart,deleteEnd);
                 encodedMatrix.setBit(deleteStart-1,false);
-                //System.out.println(cacheQueue);
                 while(baseFrame!=null){
                     for(StackFrame frame : baseFrame.getChildrenAfter(r,c)){
                         int index = getIndexFromCache(frame,0);
@@ -131,14 +122,10 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
                     }
                     baseFrame = baseFrame.parent;
                 }
-                //System.out.println(cache);
                 //printBits();
             }
         }
         cacheQueue();
-        //System.out.println("TO CACHE: "+cacheQueue);
-        //System.out.println("FINAL CACHE: "+cache);
-        //System.out.println(this);
         return data;
     }
 
@@ -148,10 +135,8 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
 
     private boolean hasData(StackFrame frame, int ignore, int size, int parentIndex){
         if(!encodedMatrix.getBit(parentIndex)){
-            //System.out.println(parentIndex+" "+headerSize());
             return false;
         }
-        //System.out.println(ignore+" "+size+" "+parentIndex);
         int iterations = frame.xLen==1||frame.yLen==1?2:4;
         for(int i = 1; i<=iterations;i++){
             if(i<ignore){
@@ -206,11 +191,8 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         if(r<0||c<0||r>=height()||c>=width()){
             throw new IllegalArgumentException("Invalid parameters");
         }
-        //System.out.println("READING "+r+" "+c);
         int dataIndex = decodeUntil(r,c,getClosestIndexFromCache(r,c)).value;
-        //System.out.println("TO CACHE: "+cacheQueue);
         cacheQueue();
-        //System.out.println("FINAL CACHE: "+cache);
         if(dataIndex<encodedMatrix.size()&&encodedMatrix.getBit(dataIndex)){
             return encodedMatrix.getBits(dataIndex+1,bitsPerData(),bitDecoder);
         }
@@ -223,11 +205,7 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         StackFrame currentFrame = frames.getLast();
         StackFrame goal = new StackFrame(r,c,1,1);
         int parentIndex = dataIndex-getIndexFromCache(currentFrame,dataIndex-1);
-        //System.out.println(collection);
-        //System.out.println(cacheQueue);
-        //System.out.println("GOAL: "+goal);
         while(dataIndex<encodedMatrix.size()&&!goal.equals(currentFrame)){
-            //System.out.println(frames);
             if(currentFrame.contains(goal.yOffset,goal.xOffset)){
                 cacheQueue.add(new Pair<>(currentFrame,dataIndex-parentIndex));
                 parentIndex = dataIndex;
@@ -249,7 +227,6 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
             currentFrame = frames.getLast();
         }
         cacheQueue.add(new Pair<>(currentFrame,dataIndex-parentIndex));
-        //System.out.println(cache);
         return new Pair<>(currentFrame,dataIndex);
     }
 
@@ -257,16 +234,11 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         StackFrame baseFrame = new StackFrame(0,0,height(),width());
         cacheQueue.add(new Pair<>(baseFrame,0));
         int dataIndex = headerSize();
-        //System.out.println(headerSize());
         while(true){
-            //System.out.println(baseFrame);
             StackFrame current = baseFrame.getChildContaining(r,c);
-            //System.out.println(current);
             int cacheIndex = getIndexFromCache(current,dataIndex);
-            //System.out.println(cacheIndex);
             if(cacheIndex!=-1){
                 dataIndex+=cacheIndex;
-                //System.out.println("IN CACHE WOW");
                 if(current.size()==1){
                     LinkedList<StackFrame> toReturn = new LinkedList<>();
                     toReturn.add(current);
@@ -276,7 +248,6 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
                     baseFrame = current;
                 }
             }else{
-                //System.out.println("NO CACHE GAY");
                 LinkedList<StackFrame> toReturn = new LinkedList<>();
                 toReturn.add(current);
                 LinkedList<StackFrame> frames = baseFrame.getChildrenBefore(r,c);

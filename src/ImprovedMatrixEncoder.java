@@ -103,11 +103,9 @@ public class ImprovedMatrixEncoder<E> implements MatrixEncoder<E> {
     }
     refSize = controller.size()-dataSize-headerSize;
     controller.trim();
-    //System.out.println("\n"+writtenPath+"\n");
     return controller;
   }
 
-  //Code so spaghetti it needs meatballs
   private boolean encodeHelper(int yOffset, int xOffset, int yLen, int xLen){
     if(yOffset>=matrix.length){
       return false;
@@ -124,7 +122,6 @@ public class ImprovedMatrixEncoder<E> implements MatrixEncoder<E> {
         writer.writeBit(false);
         return false;
       }
-      //System.out.println(item+" = "+encoder.apply(item));
       writer.writeBit(true);
       writer.writeBits(bitsPerData,item,encoder);
       lastData = controller.size();
@@ -154,7 +151,6 @@ public class ImprovedMatrixEncoder<E> implements MatrixEncoder<E> {
     }
     boolean gotData = encodeHelper(yOffset, xOffset, yLen, xLen);
     if((yLen>1||xLen>1)&&!gotData){
-      //System.out.println(lastItem+" "+indexData[lastItem]+" "+indexData[lastItem+1]);
       controller.delete(prevLength,controller.size());
       writer.writeBit(false);
     }
@@ -177,25 +173,19 @@ public class ImprovedMatrixEncoder<E> implements MatrixEncoder<E> {
     stack.add(new StackFrame(0,0,height,width));
     V[][] matrix = (V[][])new Object[height][width];
     while(stack.size()>0&&input.hasNext()){
-      //System.out.println(stack);
       boolean nextInst = input.readBit();
       int lastIndex = stack.size()-1;
       StackFrame current = stack.get(lastIndex);
       boolean readMode = current.xLen<=1&&current.yLen<=1;;
-      //System.out.print(nextInst+" ");
       if(nextInst){
         if(readMode){
-          //System.out.print("<--Read mode ");
           V data = input.readBits(bitsPerData,decoder);
-          //System.out.println("<--"+data);
           matrix[current.yOffset][current.xOffset] = data;
           stack.remove(lastIndex);
         }else{
-          //System.out.println("<--Push mode ");
           StackFrame.pushFrame(stack);
         }
       }else{
-        //System.out.println("<--Pop mode ");
         stack.remove(lastIndex);
       }
     }

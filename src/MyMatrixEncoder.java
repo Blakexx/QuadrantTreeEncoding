@@ -103,7 +103,6 @@ public class MyMatrixEncoder<E> implements MatrixEncoder<E>{
       }
     }
     refSize = writtenPath.length()-dataSize;
-    //System.out.println("\n"+writtenPath+"\n");
     String data = writtenPath.toString();
     data = data.replaceAll("[on]","0").replaceAll("[ud]","1").replaceAll(" ","");
     writer.writeBits(data);
@@ -149,7 +148,6 @@ public class MyMatrixEncoder<E> implements MatrixEncoder<E>{
         ret[1] = indexData;
         return ret;
       }
-      //System.out.println(item+" = "+encoder.apply(item));
       writtenPath.append("u");
       writtenPath.append(String.format("%"+bitsPerData+"s",encoder.apply(item)).replaceAll(" ","0"));
       foundData[4] = true;
@@ -196,18 +194,14 @@ public class MyMatrixEncoder<E> implements MatrixEncoder<E>{
     boolean gotData = foundData[4];
     if((yLen>1||xLen>1)){
       int lastItem;
-      //System.out.println(Arrays.toString(indexData));
-      //System.out.println(Arrays.toString(foundData));
       for(lastItem = 3; lastItem>-1;lastItem--){
           if(!indexData[lastItem].equals(indexData[lastItem+1])){
             break;
           }
       }
-      //System.out.println(lastItem+" "+indexData[lastItem]+" "+indexData[lastItem+1]);
       if(gotData&&!foundData[lastItem]){
         for(int i = lastItem-1; i>-1;i--){
           if(foundData[i]){
-            //System.out.println(writtenPath);x
             writtenPath.delete(indexData[i+1],indexData[4]);
             writtenPath.append("o");
             readMode|= yLen==3&&xLen==2&&i+1==1;
@@ -242,7 +236,6 @@ public class MyMatrixEncoder<E> implements MatrixEncoder<E>{
     stack.add(new StackFrame(0,0,height,width,0,0,null));
     E[][] matrix = (E[][])new Object[height][width];
     while(stack.size()>0&&input.hasNext()){
-      //System.out.println(stack);
       boolean nextInst = input.readBit();
       int lastIndex = stack.size()-1;
       StackFrame current = stack.get(lastIndex);
@@ -251,19 +244,15 @@ public class MyMatrixEncoder<E> implements MatrixEncoder<E>{
       for(int i = lastIndex;readMode&&i>=current.frameEnd;i--){
         readMode = readMode && stack.get(i).yLen<=1&&stack.get(i).xLen<=1;
       }
-      //System.out.print(nextInst+" ");
       if(nextInst){
         decodedData.append("u");
         if(readMode||currentReadMode){
-          //System.out.print("<--Read mode ");
           String dataStr = input.readBits(bitsPerData);
           E data = decoder.apply(dataStr);
-          //System.out.println("<--"+data);
           decodedData.append(dataStr);
           matrix[current.yOffset][current.xOffset] = data;
           stack.remove(lastIndex);
         }else{
-          //System.out.println("<--Push mode ");
           pushFrame(stack);
         }
       }else{
@@ -275,23 +264,19 @@ public class MyMatrixEncoder<E> implements MatrixEncoder<E>{
           override = override || (parent.xLen==2&&parent.yLen==3&&current.quadrant==1);
         }
         if(currentReadMode||override){
-          //System.out.print(override?"<--Override ":"<--Read mode ");
           if(!input.hasNext()){
             break;
           }
           boolean nextPart = input.readBit();
           if(!nextPart){
-            //System.out.println("<--Pop");
             decodedData.append("oo");
             popOut(stack);
           }else{
-            //System.out.println("<--Skip");
             decodedData.append("nd");
             stack.remove(lastIndex);
           }
         }else{
           decodedData.append("o");
-          //System.out.println("<--Pop mode ");
           popOut(stack);
         }
       }
@@ -303,7 +288,6 @@ public class MyMatrixEncoder<E> implements MatrixEncoder<E>{
         }
       }
     }
-    //System.out.println("\n"+decodedData);
     input.close();
     return matrix;
   }
@@ -330,7 +314,6 @@ public class MyMatrixEncoder<E> implements MatrixEncoder<E>{
   }
 
   private static void popOut(ArrayList<StackFrame> stack){
-    //System.out.println("Begin popping");
     int parentIndex = stack.get(stack.size()-1).frameEnd;
     while(stack.size()>parentIndex){
       stack.remove(stack.size()-1);
