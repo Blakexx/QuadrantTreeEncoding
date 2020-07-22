@@ -2,6 +2,7 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.ListIterator;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 
 public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
@@ -40,7 +41,7 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
     public int estimateBitSize(){
         int cacheSize = 0, referenceSize = 32, intSize = 32;
         for(Integer key : cache.keySet()){
-            cacheSize+=referenceSize+intSize;
+            cacheSize+=referenceSize+referenceSize;
             cacheSize+=referenceSize+intSize;
         }
         return encodedMatrix.size()+cacheSize;
@@ -403,6 +404,50 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
                 }
                 current = frames.getLast();
             }
+        }
+    }
+
+    public Iterator<DataPoint<E>> genericIterator(int startR, int startC, BiConsumer<Point,Point> incrementer){
+        return new GenericIterator<>(this,startR,startC,incrementer);
+    }
+
+    private static class GenericIterator<V> implements Iterator<DataPoint<V>>{
+
+        private final Object[][] cache;
+        private final Iterator<DataPoint<V>> treeIterator;
+        private final BiConsumer<Point,Point> incrementer;
+        private final Point point, dimensions;
+
+        private GenericIterator(CachedTreeMatrix<V> matrix, int startR, int startC, BiConsumer<Point,Point> incrementer){
+            if(matrix==null||incrementer==null){
+                throw new IllegalArgumentException("Cannot have null arguements");
+            }
+            treeIterator = matrix.iterator();
+            cache = new Byte[matrix.height()][matrix.width()];
+            this.incrementer = incrementer;
+            point = new Point(startR,startC);
+            dimensions = new Point(matrix.height(),matrix.width());
+        }
+
+        public boolean hasNext(){
+            return point.row<cache.length&&point.column<cache[point.row].length;
+        }
+
+        public DataPoint<V> next(){
+            int currentR = point.row, currentC = point.column;
+            V data = (V)cache[currentR][currentC];
+            if(data==null){
+                while(treeIterator.hasNext()){
+                    DataPoint<V> dataPoint = treeIterator.next();
+                    cache[dataPoint.row][dataPoint.column] = dataPoint.data;
+                    if(point.row==currentR&&point.column==currentC){
+                        data = dataPoint.data;
+                        break;
+                    }
+                }
+            }
+            incrementer.accept(point,dimensions);
+            return new DataPoint<>(data,currentR,currentC);
         }
     }
 }

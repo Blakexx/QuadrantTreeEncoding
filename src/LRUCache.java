@@ -1,8 +1,6 @@
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Set;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 public class LRUCache<K,V> implements CacheManager<K,V> {

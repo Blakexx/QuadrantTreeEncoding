@@ -1,10 +1,8 @@
+import javax.xml.crypto.Data;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Random;
-import java.util.Scanner;
+import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
@@ -198,15 +196,18 @@ class Main {
     boolean didFail = false;
     printProgressBar("Iterative reads",0,1,doPrint);
     int readCount = 0;
-    long nanoTime = System.nanoTime();
-    for(DataPoint<Byte> point : matrix){
+    long nanoTime;
+    Iterator<DataPoint<Byte>> iterator = matrix.iterator();
+    while(iterator.hasNext()){
+      nanoTime = System.nanoTime();
+      DataPoint<Byte> point = iterator.next();
+      timeData[0] += (System.nanoTime()-nanoTime);
       int r = point.row, c = point.column;
       if(!point.data.equals(decoded[r][c])){
         failCount++;
       }
       printProgressBar("Iterative reads",++readCount,matrix.size(),doPrint);
     }
-    timeData[0] = (System.nanoTime()-nanoTime);
     didFail = failCount>0;
     if(doPrint){
       System.out.printf("\rIterative reads %s in %.3fs\n",failCount==0?"passed":"failed",timeData[0]/Math.pow(10,9));
@@ -214,17 +215,23 @@ class Main {
     failCount = 0;
     timeData[0]/=readCount;
     printProgressBar("Stride-1 reads",0,1,doPrint);
-    readCount = 0;
-    for(int r = 0; r<matrix.height();r++){
-      for(int c = 0; c<matrix.width();c++){
-        nanoTime = System.nanoTime();
-        Byte data = matrix.get(r,c);
-        timeData[1] += System.nanoTime()-nanoTime;
-        if(!data.equals(decoded[r][c])){
-          failCount++;
-        }
-        printProgressBar("Stride-1 reads",++readCount,matrix.size(),doPrint);
+    iterator = matrix.genericIterator(0,0,(point, dimensions)->{
+      point.column++;
+      if(point.column==dimensions.column){
+        point.column = 0;
+        point.row++;
       }
+    });
+    readCount = 0;
+    while(iterator.hasNext()){
+      nanoTime = System.nanoTime();
+      DataPoint<Byte> point = iterator.next();
+      timeData[1] += (System.nanoTime()-nanoTime);
+      int r = point.row, c = point.column;
+      if(!point.data.equals(decoded[r][c])){
+        failCount++;
+      }
+      printProgressBar("Stride-1 reads",++readCount,matrix.size(),doPrint);
     }
     didFail |= failCount>0;
     if(doPrint){
