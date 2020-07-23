@@ -60,7 +60,7 @@ class Main {
   }
 
   public static void readWriteTester(double fullness, double cachePercent) throws IOException{
-    StringBuilder data = new StringBuilder("Rows Columns Fullness Total_Bits Dense_Bits Iterative_Read Stride1_Read Random_Read Iterative_Write Stride1_Write Random_Write");
+    StringBuilder data = new StringBuilder("Rows Columns Fullness Cache_Size Total_Bits Dense_Bits Iterative_Read Stride1_Read Random_Read Iterative_Write Stride1_Write Random_Write");
     System.out.println(data);
     data.append("\n");
     double scale = Math.pow(10,3);
