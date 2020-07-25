@@ -296,10 +296,6 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         return getIndexFromCache(frame,parentIndex,false);
     }
 
-    private int logBaseCeil(int num, int base){
-        return (int)Math.ceil(Math.log(num)/Math.log(base));
-    }
-
     public int bitsPerData(){
         return encodedMatrix.getBits(0,8,intDecoder);
     }

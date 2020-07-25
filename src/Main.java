@@ -93,7 +93,7 @@ class Main {
       }
       avgBits/=runsPerSize;
       StringBuilder tempString = new StringBuilder();
-      tempString.append(d).append(" ").append(d).append(" ").append(String.format("%.1f", fullness)).append(" ").append(String.format("%.2f", cachePercent)).append(" ").append(avgBits).append(" ").append(d * d * 8);
+      tempString.append(d).append(" ").append(d).append(" ").append(String.format("%.2f", fullness)).append(" ").append(String.format("%.2f", cachePercent)).append(" ").append(avgBits).append(" ").append(d * d * 8);
       for(int i = 0; i<timeData.length;i++){
         timeData[i]/=runsPerSize;
         timeData[i]/=scale;
@@ -333,14 +333,17 @@ class Main {
   }
 
   public static void matrixTester(MatrixEncoder<Byte> encoder) throws IOException{
-    StringBuilder data = new StringBuilder("Rows Columns Fullness Bottum_Bits CRS_Bits Data_Bits Total_Bits Dense_Bits\n");
+    StringBuilder data = new StringBuilder("Rows Columns Fullness QTE_Bits CRS_Bits Data_Bits Total_Bits Dense_Bits");
+    System.out.println(data);
+    data.append("\n");
     for(int d = 10; d<=1000;d*=10){
       Byte[][] matrix;
-      for(double sparse = .1; sparse<=1;sparse+=.1){
+      for(double sparse = 0; sparse<=1;sparse+=sparse<=.09?.01:.1){
         long avgCRS = 0;
         long avgBits = 0;
         long averageTotal = 0;
-        for(int i = 0; i<3;i++){
+        int runsPerSize = 3;
+        for(int i = 0; i<runsPerSize;i++){
           matrix = generateMatrix(d,d,sparse);
           encoder.setMatrix(matrix);
           MemoryController controller = encoder.encodeMatrix();
@@ -357,10 +360,10 @@ class Main {
           avgCRS+=estimateCRS(matrix);
           averageTotal+=controller.size();
         }
-        avgBits/=10;
-        avgCRS/=10;
-        averageTotal/=10;
-        String str = d+" "+d+" "+String.format("%.1f",sparse)+" "+avgBits+" "+avgCRS+" "+(int)Math.round(d*d*sparse*8)+" "+averageTotal+" "+(d*d*8);
+        avgBits/=runsPerSize;
+        avgCRS/=runsPerSize;
+        averageTotal/=runsPerSize;
+        String str = d+" "+d+" "+String.format("%.2f",sparse)+" "+avgBits+" "+avgCRS+" "+averageTotal+" "+(d*d*8);
         System.out.println(str);
         str+="\n";
         data.append(str);
@@ -401,22 +404,21 @@ class Main {
   }
 
   public static int estimateCRS(Byte[][] matrix){
-    int data = 0;
-    int bitsPerRowRef = (int)Math.ceil(Math.log(matrix.length)/Math.log(2));
-    int bitsPerColRef = (int)Math.ceil(Math.log(matrix[0].length)/Math.log(2));
+    int data = 0, dataCount = 0;
+    int bitsPerColRef = logBaseCeil(matrix[0].length,2);
+    int bitsPerRowRef = logBaseCeil(matrix.length*matrix[0].length,2);
     for(int i = 0; i<matrix.length;i++){
-      boolean hasData = false;
       for(int j = 0; j<matrix[i].length;j++){
-        if(!matrix[i][j].equals((byte)0)){
-          if(!hasData){
-            hasData = true;
-            data+=bitsPerRowRef;
-          }
-          data+=bitsPerColRef;
-        }
+        dataCount+=!matrix[i][j].equals((byte)0)?1:0;
       }
     }
+    data+=bitsPerColRef*dataCount;
+    data+=bitsPerRowRef*matrix.length;
     return data;
+  }
+
+  private static int logBaseCeil(int num, int base){
+    return (int)Math.ceil(Math.log(num)/Math.log(base));
   }
 
   public static boolean equal(Object[][] matrix1, Object[][] matrix2){
