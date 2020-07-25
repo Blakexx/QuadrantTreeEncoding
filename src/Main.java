@@ -166,16 +166,23 @@ class Main {
     timeData[1]/=readCount;
     failCount+=passed?0:1;
     toWrite = new CachedTreeMatrix<>(empty,8,matrix.bitEncoder,matrix.bitDecoder,matrix.cachePercent);
-
     printProgressBar("Random writes",0,1,doPrint);
     readCount = 0;
+    ArrayList<Point> points = new ArrayList<>();
+    for(int r = 0; r<matrix.height();r++){
+      for(int c = 0; c<matrix.width();c++){
+        points.add(new Point(r,c));
+      }
+    }
     Random rand = new Random();
     for(int count = 0; count<matrix.size();count++){
-      int r = rand.nextInt(matrix.height());
-      int c = rand.nextInt(matrix.width());
+      int index = rand.nextInt(points.size());
+      Point point = points.get(index);
+      int r = point.row, c = point.column;
       nanoTime = System.nanoTime();
       empty[r][c] = toWrite.set(r,c,decoded[r][c]);
       timeData[2] += System.nanoTime()-nanoTime;
+      points.remove(index);
       printProgressBar("Random writes",++readCount,matrix.size(),doPrint);
     }
     passed = equal(empty,toWrite.toRawMatrix());

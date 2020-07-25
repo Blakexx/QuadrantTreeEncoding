@@ -67,7 +67,6 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         if(data==null||r<0||c<0||r>=height()||c>=width()){
             throw new IllegalArgumentException("Invalid parameters");
         }
-        //printBits();
         Pair<StackFrame,Integer> frameInfo = decodeUntil(r,c,getClosestIndexFromCache(r,c));
         int dataIndex = frameInfo.value;
         StackFrame baseFrame = frameInfo.key;
