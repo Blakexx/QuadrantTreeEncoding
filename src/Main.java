@@ -229,7 +229,7 @@ class Main {
         point.column = 0;
         point.row++;
       }
-    });
+    }, (point,dimensions)->point.row<dimensions.row&&point.column<dimensions.column&&point.column>-1&&point.row>-1);
     while(iterator.hasNext()){
       nanoTime = System.nanoTime();
       DataPoint<Byte> point = iterator.next();

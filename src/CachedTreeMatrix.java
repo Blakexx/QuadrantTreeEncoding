@@ -5,6 +5,7 @@ import java.util.ListIterator;
 import java.util.NoSuchElementException;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
 
 public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
     private final MemoryController encodedMatrix;
@@ -406,8 +407,8 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         }
     }
 
-    public Iterator<DataPoint<E>> genericIterator(int startR, int startC, BiConsumer<Point,Point> incrementer){
-        return new GenericIterator<>(this,startR,startC,incrementer);
+    public Iterator<DataPoint<E>> genericIterator(int startR, int startC, BiConsumer<Point,Point> incrementer, BiPredicate<Point,Point> nextChecker){
+        return new GenericIterator<>(this,startR,startC,incrementer, nextChecker);
     }
 
     private static class GenericIterator<V> implements Iterator<DataPoint<V>>{
@@ -415,9 +416,10 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         private final Object[][] cache;
         private final Iterator<DataPoint<V>> treeIterator;
         private final BiConsumer<Point,Point> incrementer;
+        private final BiPredicate<Point,Point> nextChecker;
         private final Point point, dimensions;
 
-        private GenericIterator(CachedTreeMatrix<V> matrix, int startR, int startC, BiConsumer<Point,Point> incrementer){
+        private GenericIterator(CachedTreeMatrix<V> matrix, int startR, int startC, BiConsumer<Point,Point> incrementer, BiPredicate<Point,Point> nextChecker){
             if(matrix==null||incrementer==null){
                 throw new IllegalArgumentException("Cannot have null arguements");
             }
@@ -426,10 +428,11 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
             this.incrementer = incrementer;
             point = new Point(startR,startC);
             dimensions = new Point(matrix.height(),matrix.width());
+            this.nextChecker = nextChecker;
         }
 
         public boolean hasNext(){
-            return point.row<dimensions.row&&point.column<dimensions.column&&point.column>-1&&point.row>-1;
+            return nextChecker.test(point,dimensions);
         }
 
         public DataPoint<V> next(){
