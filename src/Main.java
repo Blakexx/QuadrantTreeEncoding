@@ -349,7 +349,8 @@ class Main {
   }
 
   public static void matrixTester(MatrixEncoder<Byte> encoder) throws IOException{
-    StringBuilder data = new StringBuilder("Rows Columns Fullness QTE_Bits CRS_Bits Data_Bits Total_Bits Dense_Bits");
+    String formatName = encoder.getClass()==HybridMatrixEncoder.class?"Hybrid":"QTE";
+    StringBuilder data = new StringBuilder("Rows Columns Fullness "+formatName+"_Bits CRS_Bits Data_Bits Total_Bits Dense_Bits");
     System.out.println(data);
     data.append("\n");
     for(int d = 10; d<=1000;d*=10){
