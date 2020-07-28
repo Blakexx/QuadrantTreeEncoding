@@ -1,9 +1,10 @@
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.function.BiFunction;
 
-public class ImprovedMatrixEncoder<E> implements MatrixEncoder<E> {
+public class QuadrantTreeEncoder<E> implements MatrixEncoder<E> {
 
   private E[][] matrix;
   private BiFunction<E,Integer,byte[]> encoder;
@@ -14,7 +15,7 @@ public class ImprovedMatrixEncoder<E> implements MatrixEncoder<E> {
   private int refSize, dataSize, headerSize;
   private int bitsPerData, longestX;
 
-  public ImprovedMatrixEncoder(E[][] m, int bitsPerData, BiFunction<E,Integer,byte[]> e, BiFunction<byte[],Integer,E> d){
+  public QuadrantTreeEncoder(E[][] m, int bitsPerData, BiFunction<E,Integer,byte[]> e, BiFunction<byte[],Integer,E> d){
     matrix = m;
     encoder = e;
     decoder = d;
@@ -94,8 +95,7 @@ public class ImprovedMatrixEncoder<E> implements MatrixEncoder<E> {
     writer.writeBits(widthBits,width,intEncoder);
     headerSize=8+bitsPerData+5+heightBits+5+widthBits;
     if((longestX>1||matrix.length>1)&&dataSize>0){
-      writer.writeBit(true);
-      encodeHelper(0, 0, matrix.length, longestX);
+      doPathSetup(new StackFrame(0,0,height,width));
       //controller.delete(lastData,controller.size());
     }else{
       writer.writeBit(false);
@@ -105,11 +105,12 @@ public class ImprovedMatrixEncoder<E> implements MatrixEncoder<E> {
     return controller;
   }
 
-  private boolean encodeHelper(int yOffset, int xOffset, int yLen, int xLen){
+  private boolean encodeHelper(StackFrame frame){
+    int yOffset = frame.yOffset, xOffset = frame.xOffset;
     if(yOffset>=matrix.length){
       return false;
     }
-    if(yLen<=1&&xLen<=1){
+    if(frame.size()<=1){
       if(xOffset>=matrix[yOffset].length){
         if(xOffset<longestX){
           writer.writeBit(false);
@@ -125,30 +126,21 @@ public class ImprovedMatrixEncoder<E> implements MatrixEncoder<E> {
       writer.writeBits(bitsPerData,item,encoder);
       return true;
     }else{
-      int nyLen = yLen/2, yDif = yLen-nyLen;
-      int nxLen = xLen/2, xDif = xLen-nxLen;
-      int newY = yOffset+nyLen, newX = xOffset+nxLen;
-      boolean foundData = doPathSetup(yOffset, xOffset, nyLen, nxLen,0);
-      if(xLen>1){
-        foundData|=doPathSetup(yOffset, newX, nyLen, xDif,1);
-      }
-      if(yLen>1){
-        foundData|=doPathSetup(newY, xOffset, yDif, nxLen,2);
-      }
-      if(yLen>1&&xLen>1){
-        foundData|=doPathSetup(newY, newX, yDif, xDif,3);
+      boolean foundData = false;
+      for(StackFrame child : frame.getChildren()){
+        foundData|=doPathSetup(child);
       }
       return foundData;
     }
   }
 
-  private boolean doPathSetup(int yOffset, int xOffset, int yLen, int xLen, int quad){
+  private boolean doPathSetup(StackFrame frame){
     int prevLength = controller.size();
-    if(yLen>1||xLen>1){
+    if(frame.size()>1){
       writer.writeBit(true);
     }
-    boolean gotData = encodeHelper(yOffset, xOffset, yLen, xLen);
-    if((yLen>1||xLen>1)&&!gotData){
+    boolean gotData = encodeHelper(frame);
+    if(frame.size()>1&&!gotData){
       controller.delete(prevLength,controller.size());
       writer.writeBit(false);
     }
@@ -163,7 +155,7 @@ public class ImprovedMatrixEncoder<E> implements MatrixEncoder<E> {
     BiFunction<byte[],Integer,Integer> intDecoder = BitEncoders.intDecoder;
     int bitsPerData = input.readBits(8,intDecoder);
     V defaultItem = input.readBits(bitsPerData,decoder);
-    ArrayList<StackFrame> stack = new ArrayList<>();
+    LinkedList<StackFrame> stack = new LinkedList<>();
     int heightBits = input.readBits(5,intDecoder)+1;
     int height = input.readBits(heightBits,intDecoder);
     int widthBits = input.readBits(5,intDecoder)+1;
@@ -172,19 +164,18 @@ public class ImprovedMatrixEncoder<E> implements MatrixEncoder<E> {
     V[][] matrix = (V[][])new Object[height][width];
     while(stack.size()>0&&input.hasNext()){
       boolean nextInst = input.readBit();
-      int lastIndex = stack.size()-1;
-      StackFrame current = stack.get(lastIndex);
+      StackFrame current = stack.getLast();
       boolean readMode = current.xLen<=1&&current.yLen<=1;;
       if(nextInst){
         if(readMode){
           V data = input.readBits(bitsPerData,decoder);
           matrix[current.yOffset][current.xOffset] = data;
-          stack.remove(lastIndex);
+          stack.removeLast();
         }else{
           StackFrame.pushFrame(stack);
         }
       }else{
-        stack.remove(lastIndex);
+        stack.removeLast();
       }
     }
     for(int r = 0; r<height;r++){

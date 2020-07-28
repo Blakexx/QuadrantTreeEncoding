@@ -1,4 +1,3 @@
-import javax.xml.crypto.Data;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -11,7 +10,7 @@ class Main {
     BiFunction<Byte, Integer, byte[]> enc = (num, bitsPerData)->new byte[]{(byte)(num<<(8-bitsPerData))};
     BiFunction<byte[], Integer, Byte> dec = (bytes, bitsPerData)->(byte)(bytes[0]>>>(8-bitsPerData));
     MatrixEncoder<Byte> encoder;
-    encoder = new ImprovedMatrixEncoder<>(
+    encoder = new QuadrantTreeEncoder<>(
             null,
             8,
             enc,
@@ -21,7 +20,7 @@ class Main {
     System.out.println("1: Custom Tester");
     System.out.println("2: Disk Size Tester");
     System.out.println("3: Read/Write Tester");
-    int type = readInt("Test type",in,(i)->i>=1&&i<=3);
+    int type = readInt("Test Type",in,(i)->i>=1&&i<=3);
     System.out.println();
     if(type==1){
       MemoryController controller = customTester(encoder);
@@ -50,6 +49,16 @@ class Main {
         }
       }while(true);
     }else if(type==2){
+      System.out.println("1: Default Encoding");
+      System.out.println("2: Hybrid Encoding");
+      type = readInt("Encoding Type",in,(i)->i==1||i==2);
+      System.out.println();
+      encoder = type==2?new HybridMatrixEncoder<>(
+              null,
+              8,
+              enc,
+              dec
+      ):encoder;
       matrixTester(encoder);
     }else{
       double fullness = readDouble("Fullness", in, (i)->i>=0&&i<=1);
@@ -411,6 +420,10 @@ class Main {
   }
 
   public static int estimateCRS(Byte[][] matrix){
+    return estimateCRS1(matrix);
+  }
+
+  private static int estimateCRS1(Byte[][] matrix){
     int data = 0, dataCount = 0;
     int bitsPerColRef = logBaseCeil(matrix[0].length,2);
     int bitsPerRowRef = logBaseCeil(matrix.length*matrix[0].length,2);
@@ -424,7 +437,38 @@ class Main {
     return data;
   }
 
-  private static int logBaseCeil(int num, int base){
+  private static int estimateCRS2(Byte[][] matrix){
+    int dataCount = 0;
+    int bitsPerColRef = logBaseCeil(matrix[0].length,2);
+    int bitsPerRowRef = logBaseCeil(matrix.length,2);
+    for(int i = 0; i<matrix.length;i++){
+      for(int j = 0; j<matrix[i].length;j++){
+        dataCount+=!matrix[i][j].equals((byte)0)?1:0;
+      }
+    }
+    return dataCount*(bitsPerRowRef+bitsPerColRef);
+  }
+
+  private static int estimateCRS3(Byte[][] matrix){
+    int data = 0;
+    int bitsPerColRef = logBaseCeil(matrix[0].length,2)+1;
+    int bitsPerRowRef = logBaseCeil(matrix.length,2)+1;
+    for(int i = 0; i<matrix.length;i++){
+      boolean hasData = false;
+      for(int j = 0; j<matrix[i].length;j++){
+        if(!matrix[i][j].equals((byte)0)){
+          if(!hasData){
+            hasData = true;
+            data+=bitsPerRowRef;
+          }
+          data+=bitsPerColRef;
+        }
+      }
+    }
+    return data;
+  }
+
+  public static int logBaseCeil(int num, int base){
     return (int)Math.ceil(Math.log(num)/Math.log(base));
   }
 

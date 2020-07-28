@@ -32,7 +32,7 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
     }
 
     public CachedTreeMatrix(E[][] matrix, int bitsPerData, BiFunction<E,Integer,byte[]> bitEncoder, BiFunction<byte[],Integer,E> bitDecoder, double cachePercent){
-        this(new ImprovedMatrixEncoder<>(
+        this(new QuadrantTreeEncoder<>(
                 matrix,
                 bitsPerData,
                 bitEncoder,
@@ -329,7 +329,7 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
     }
 
     public E[][] toRawMatrix() throws IOException {
-        return ImprovedMatrixEncoder.decodeMatrix(encodedMatrix.inputStream(),bitDecoder);
+        return QuadrantTreeEncoder.decodeMatrix(encodedMatrix.inputStream(),bitDecoder);
     }
 
     public String toString(){

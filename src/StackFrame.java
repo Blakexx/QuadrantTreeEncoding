@@ -44,24 +44,29 @@ public class StackFrame{
         return "("+yLen+", "+xLen+", "+yOffset+", "+xOffset+")";
     }
 
-    public static void pushFrame(List<StackFrame> stack){
-        int lastIndex = stack.size()-1;
-        StackFrame current = stack.remove(lastIndex);
-        int yLen = current.yLen, xLen = current.xLen;
-        int yOffset = current.yOffset, xOffset = current.xOffset;
+    public static void pushFrame(LinkedList<StackFrame> stack){
+        LinkedList<StackFrame> children = stack.removeLast().getChildren();
+        while(children.size()>0){
+            stack.add(children.removeLast());
+        }
+    }
+
+    public LinkedList<StackFrame> getChildren(){
+        LinkedList<StackFrame> stack = new LinkedList<>();
         int nyLen = Math.max(1,yLen/2), yDif = yLen-nyLen;
         int nxLen = Math.max(1,xLen/2), xDif = xLen-nxLen;
         int newY = yOffset+nyLen, newX = xOffset+nxLen;
-        if(yLen>1&&xLen>1){
-            stack.add(new StackFrame(newY, newX, yDif, xDif,current,3));
+        stack.add(new StackFrame(yOffset, xOffset, nyLen, nxLen,this,0));
+        if(xLen>1){
+            stack.add(new StackFrame(yOffset, newX, nyLen, xDif,this,1));
         }
         if(yLen>1){
-            stack.add(new StackFrame(newY, xOffset, yDif, nxLen,current,2));
+            stack.add(new StackFrame(newY, xOffset, yDif, nxLen,this,2));
         }
-        if(xLen>1){
-            stack.add(new StackFrame(yOffset, newX, nyLen, xDif,current,1));
+        if(yLen>1&&xLen>1){
+            stack.add(new StackFrame(newY, newX, yDif, xDif,this,3));
         }
-        stack.add(new StackFrame(yOffset, xOffset, nyLen, nxLen,current,0));
+        return stack;
     }
 
     public LinkedList<StackFrame> getChildrenBefore(int r, int c){
