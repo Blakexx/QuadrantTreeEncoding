@@ -335,7 +335,7 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
     public String toString(){
         Object[][] mat;
         try{
-           mat = toRawMatrix();
+            mat = toRawMatrix();
         }catch(Exception e){
             return e.toString();
         }
