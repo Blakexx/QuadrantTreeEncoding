@@ -36,7 +36,7 @@ public class StackFrame{
     }
 
     public boolean equals(Object o){
-        if(o==null){
+        if(o==null||o.getClass()!=StackFrame.class){
             return false;
         }
         StackFrame other = (StackFrame)o;
@@ -48,7 +48,7 @@ public class StackFrame{
     }
 
     private StackFrame getQuadrantFrame(int quadrant){
-        StackFrame returned =  switch(quadrant){
+        StackFrame returned = switch(quadrant){
             case 0 -> new StackFrame(yPos, xPos, nHeight, nWidth, this, 0);
             case 1 -> new StackFrame(yPos, newX, nHeight, wDif, this, 1);
             case 2 -> new StackFrame(newY, xPos, hDif, nWidth, this, 2);

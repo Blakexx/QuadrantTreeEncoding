@@ -92,7 +92,7 @@ class Main {
                     timeData[1]+=tempData[1];
                     timeData[2]+=tempData[2];
                 }
-                if(d<=512){
+                if(d<=256){
                     tempData = runSetTests(matrix,false);
                     timeData[3]+=tempData[0];
                     timeData[4]+=tempData[1];
