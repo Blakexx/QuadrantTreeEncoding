@@ -106,18 +106,18 @@ public class QuadrantTreeEncoder<E> implements MatrixEncoder<E> {
     }
 
     private boolean encodeHelper(StackFrame frame){
-        int yOffset = frame.yOffset, xOffset = frame.xOffset;
-        if(yOffset>=matrix.length){
+        int yPos = frame.yPos, xPos = frame.xPos;
+        if(yPos>=matrix.length){
             return false;
         }
         if(frame.size()<=1){
-            if(xOffset>=matrix[yOffset].length){
-                if(xOffset<longestX){
+            if(xPos>=matrix[yPos].length){
+                if(xPos<longestX){
                     writer.writeBit(false);
                 }
                 return false;
             }
-            E item = matrix[yOffset][xOffset];
+            E item = matrix[yPos][xPos];
             if(item.equals(defaultItem)){
                 writer.writeBit(false);
                 return false;
@@ -165,11 +165,11 @@ public class QuadrantTreeEncoder<E> implements MatrixEncoder<E> {
         while(stack.size()>0&&input.hasNext()){
             boolean nextInst = input.readBit();
             StackFrame current = stack.getLast();
-            boolean readMode = current.xLen<=1&&current.yLen<=1;;
+            boolean readMode = current.width<=1&&current.height<=1;;
             if(nextInst){
                 if(readMode){
                     V data = input.readBits(bitsPerData,decoder);
-                    matrix[current.yOffset][current.xOffset] = data;
+                    matrix[current.yPos][current.xPos] = data;
                     stack.removeLast();
                 }else{
                     StackFrame.pushFrame(stack);

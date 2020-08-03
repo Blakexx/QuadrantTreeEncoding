@@ -13,7 +13,7 @@ When run, you are presented with three options in the console.
 2: Disk Size Tester  
 3: Read/Write Tester  
 
-Custom Tester allows you to input information about your desired matrix, and then performn operations on it.
+Custom Tester allows you to input information about your desired matrix, and then perform operations on it.
 
 Disk Size Tester will run analytics on the bit size of the encoded matrix, and save its results in diskData.txt.
 

@@ -96,7 +96,7 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
                     baseFrame = baseFrame.parent;
                     int ignoreIndex = cacheQueue.getLast().value;
                     if(!hasData(baseFrame,ignoreIndex,removed,dataIndex-=ignoreIndex)){
-                        int children = baseFrame.xLen==1||baseFrame.yLen==1?2:4;
+                        int children = baseFrame.width==1||baseFrame.height==1?2:4;
                         deleteStart = Math.min(dataIndex+1,deleteStart);
                         deleteEnd = Math.max(dataIndex+1+removed+children,deleteEnd);
                         while(cacheQueue.getLast().key.parent==baseFrame){
@@ -139,7 +139,7 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         if(!encodedMatrix.getBit(parentIndex)){
             return false;
         }
-        int iterations = frame.xLen==1||frame.yLen==1?2:4;
+        int iterations = frame.width==1||frame.height==1?2:4;
         for(int i = 1; i<=iterations;i++){
             if(i<ignore){
                 if(encodedMatrix.getBit(parentIndex+i)){
@@ -208,7 +208,7 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         StackFrame goal = new StackFrame(r,c,1,1);
         int parentIndex = dataIndex-getIndexFromCache(currentFrame,dataIndex-1);
         while(dataIndex<encodedMatrix.size()&&!goal.equals(currentFrame)){
-            if(currentFrame.contains(goal.yOffset,goal.xOffset)){
+            if(currentFrame.contains(goal.yPos,goal.xPos)){
                 cacheQueue.add(new Pair<>(currentFrame,dataIndex-parentIndex));
                 parentIndex = dataIndex;
             }
@@ -220,7 +220,7 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
                     StackFrame.pushFrame(frames);
                 }
             }else{
-                if(currentFrame.contains(goal.yOffset,goal.xOffset)){
+                if(currentFrame.contains(goal.yPos,goal.xPos)){
                     return new Pair<>(currentFrame,dataIndex);
                 }
                 frames.removeLast();
@@ -289,7 +289,7 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
     }
 
     private int frameHash(StackFrame frame){
-        return frame.yOffset*width()+frame.xOffset;
+        return frame.yPos*width()+frame.xPos;
     }
 
     private int getIndexFromCache(StackFrame frame, int parentIndex){
@@ -390,14 +390,14 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
                         index++;
                         frames.removeLast();
                     }
-                    return new DataPoint<>(matrix.defaultItem(),current.yOffset+prevCount/current.xLen,current.xOffset+prevCount%current.xLen);
+                    return new DataPoint<>(matrix.defaultItem(),current.yPos+prevCount/current.width,current.xPos+prevCount%current.width);
                 }else{
                     index++;
                     if(current.size()==1){
                         V datum = data.getBits(index,matrix.bitsPerData(),matrix.bitDecoder);
                         frames.removeLast();
                         index+=matrix.bitsPerData();
-                        return new DataPoint<>(datum,current.yOffset,current.xOffset);
+                        return new DataPoint<>(datum,current.yPos,current.xPos);
                     }else{
                         StackFrame.pushFrame(frames);
                     }

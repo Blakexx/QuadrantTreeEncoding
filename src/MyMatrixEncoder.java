@@ -110,7 +110,7 @@ public class MyMatrixEncoder<E> implements MatrixEncoder<E>{
     }
 
     //Code so spaghetti it needs meatballs
-    private Object[][] encodeHelper(int yOffset, int xOffset, int yLen, int xLen) throws IOException{
+    private Object[][] encodeHelper(int yPos, int xPos, int height, int width) throws IOException{
         Boolean[] foundData = new Boolean[5];
         for(int i = 0; i<foundData.length;i++){
             foundData[i] = false;
@@ -119,25 +119,25 @@ public class MyMatrixEncoder<E> implements MatrixEncoder<E>{
         for(int i = 0; i<indexData.length;i++){
             indexData[i] = 0;
         }
-        if(yOffset>=matrix.length){
+        if(yPos>=matrix.length){
             Object[][] ret = new Object[2][];
             ret[0] = foundData;
             ret[1] = indexData;
             return ret;
         }
-        if(yLen<=1&&xLen<=1){
-            if(xOffset>=matrix[yOffset].length){
+        if(height<=1&&width<=1){
+            if(xPos>=matrix[yPos].length){
                 Object[][] ret = new Object[2][];
                 ret[0] = foundData;
                 ret[1] = indexData;
-                if(xOffset<longestX){
+                if(xPos<longestX){
                     int len = writtenPath.length();
                     //writtenPath.delete(len-1,len);
                     writtenPath.append("nd");
                 }
                 return ret;
             }
-            E item = matrix[yOffset][xOffset];
+            E item = matrix[yPos][xPos];
             if(item.equals(defaultItem)){
                 int len = writtenPath.length();
                 //writtenPath.delete(len-1,len);
@@ -155,22 +155,22 @@ public class MyMatrixEncoder<E> implements MatrixEncoder<E>{
             ret[1] = indexData;
             return ret;
         }else{
-            int nyLen = yLen/2, yDif = yLen-nyLen;
-            int nxLen = xLen/2, xDif = xLen-nxLen;
-            int newY = yOffset+nyLen, newX = xOffset+nxLen;
+            int nHeight = height/2, hDif = height-nHeight;
+            int nWidth = width/2, wDif = width-nWidth;
+            int newY = yPos+nHeight, newX = xPos+nWidth;
             indexData[0] = writtenPath.length();
-            foundData[0] = doPathSetup(yOffset, xOffset, nyLen, nxLen,0);
+            foundData[0] = doPathSetup(yPos, xPos, nHeight, nWidth,0);
             indexData[1] = writtenPath.length();
-            if(xLen>1){
-                foundData[1] = doPathSetup(yOffset, newX, nyLen, xDif,1);
+            if(width>1){
+                foundData[1] = doPathSetup(yPos, newX, nHeight, wDif,1);
             }
             indexData[2] = writtenPath.length();
-            if(yLen>1){
-                foundData[2] = doPathSetup(newY, xOffset, yDif, nxLen,2);
+            if(height>1){
+                foundData[2] = doPathSetup(newY, xPos, hDif, nWidth,2);
             }
             indexData[3] = writtenPath.length();
-            if(yLen>1&&xLen>1){
-                foundData[3] = doPathSetup(newY, newX, yDif, xDif,3);
+            if(height>1&&width>1){
+                foundData[3] = doPathSetup(newY, newX, hDif, wDif,3);
             }
             indexData[4] = writtenPath.length();
             foundData[4] = foundData[0]||foundData[1]||foundData[2]||foundData[3];
@@ -181,17 +181,17 @@ public class MyMatrixEncoder<E> implements MatrixEncoder<E>{
         }
     }
 
-    private boolean doPathSetup(int yOffset, int xOffset, int yLen, int xLen, int quad) throws IOException{
+    private boolean doPathSetup(int yPos, int xPos, int height, int width, int quad) throws IOException{
         int prevLength = writtenPath.length();
-        boolean readMode = yLen/2.0<=1&&xLen/2.0<=1;
-        if(yLen>1||xLen>1){
+        boolean readMode = height/2.0<=1&&width/2.0<=1;
+        if(height>1||width>1){
             writtenPath.append("u");
         }
-        Object[][] data = encodeHelper(yOffset, xOffset, yLen, xLen);
+        Object[][] data = encodeHelper(yPos, xPos, height, width);
         Boolean[] foundData = Arrays.copyOf(data[0],data[0].length,Boolean[].class);
         Integer[] indexData = Arrays.copyOf(data[1],data[1].length,Integer[].class);
         boolean gotData = foundData[4];
-        if((yLen>1||xLen>1)){
+        if((height>1||width>1)){
             int lastItem;
             for(lastItem = 3; lastItem>-1;lastItem--){
                 if(!indexData[lastItem].equals(indexData[lastItem+1])){
@@ -203,8 +203,8 @@ public class MyMatrixEncoder<E> implements MatrixEncoder<E>{
                     if(foundData[i]){
                         writtenPath.delete(indexData[i+1],indexData[4]);
                         writtenPath.append("o");
-                        readMode|= yLen==3&&xLen==2&&i+1==1;
-                        readMode|= yLen==2&&xLen==3&&i+1==2;
+                        readMode|= height==3&&width==2&&i+1==1;
+                        readMode|= height==2&&width==3&&i+1==2;
                         if(readMode){
                             writtenPath.append("o");
                         }
@@ -214,7 +214,7 @@ public class MyMatrixEncoder<E> implements MatrixEncoder<E>{
             }else if(!gotData){
                 writtenPath.delete(prevLength,writtenPath.length());
                 writtenPath.append("uo");
-                if(yLen/2<=1&&xLen/2<=1){
+                if(height/2<=1&&width/2<=1){
                     writtenPath.append("o");
                 }
             }
@@ -238,10 +238,10 @@ public class MyMatrixEncoder<E> implements MatrixEncoder<E>{
             boolean nextInst = input.readBit();
             int lastIndex = stack.size()-1;
             StackFrame current = stack.get(lastIndex);
-            boolean currentReadMode = current.xLen<=1&&current.yLen<=1;
+            boolean currentReadMode = current.width<=1&&current.height<=1;
             boolean readMode = currentReadMode;
             for(int i = lastIndex;readMode&&i>=current.frameEnd;i--){
-                readMode = readMode && stack.get(i).yLen<=1&&stack.get(i).xLen<=1;
+                readMode = readMode && stack.get(i).height<=1&&stack.get(i).width<=1;
             }
             if(nextInst){
                 decodedData.append("u");
@@ -249,7 +249,7 @@ public class MyMatrixEncoder<E> implements MatrixEncoder<E>{
                     String dataStr = input.readBits(bitsPerData);
                     E data = decoder.apply(dataStr);
                     decodedData.append(dataStr);
-                    matrix[current.yOffset][current.xOffset] = data;
+                    matrix[current.yPos][current.xPos] = data;
                     stack.remove(lastIndex);
                 }else{
                     pushFrame(stack);
@@ -258,9 +258,9 @@ public class MyMatrixEncoder<E> implements MatrixEncoder<E>{
                 StackFrame parent = current.parent;
                 boolean override = false;
                 if(parent!=null){
-                    override = current.quadrant==0 && parent.xLen/2<=1&&parent.yLen/2<=1;
-                    override = override || (parent.xLen==3&&parent.yLen==2&&current.quadrant==2);
-                    override = override || (parent.xLen==2&&parent.yLen==3&&current.quadrant==1);
+                    override = current.quadrant==0 && parent.width/2<=1&&parent.height/2<=1;
+                    override = override || (parent.width==3&&parent.height==2&&current.quadrant==2);
+                    override = override || (parent.width==2&&parent.height==3&&current.quadrant==1);
                 }
                 if(currentReadMode||override){
                     if(!input.hasNext()){
@@ -294,21 +294,21 @@ public class MyMatrixEncoder<E> implements MatrixEncoder<E>{
     private static void pushFrame(ArrayList<StackFrame> stack){
         int lastIndex = stack.size()-1;
         StackFrame current = stack.get(lastIndex);
-        int yLen = current.yLen, xLen = current.xLen;
-        int yOffset = current.yOffset, xOffset = current.xOffset;
-        int nyLen = yLen/2, yDif = yLen-nyLen;
-        int nxLen = xLen/2, xDif = xLen-nxLen;
-        int newY = yOffset+nyLen, newX = xOffset+nxLen;
-        if(yLen>1&&xLen>1){
-            stack.add(new StackFrame(newY, newX, yDif, xDif,3,lastIndex,current));
+        int height = current.height, width = current.width;
+        int yPos = current.yPos, xPos = current.xPos;
+        int nHeight = height/2, hDif = height-nHeight;
+        int nWidth = width/2, wDif = width-nWidth;
+        int newY = yPos+nHeight, newX = xPos+nWidth;
+        if(height>1&&width>1){
+            stack.add(new StackFrame(newY, newX, hDif, wDif,3,lastIndex,current));
         }
-        if(yLen>1){
-            stack.add(new StackFrame(newY, xOffset, yDif, nxLen,2,lastIndex,current));
+        if(height>1){
+            stack.add(new StackFrame(newY, xPos, hDif, nWidth,2,lastIndex,current));
         }
-        if(xLen>1){
-            stack.add(new StackFrame(yOffset, newX, nyLen, xDif,1,lastIndex,current));
+        if(width>1){
+            stack.add(new StackFrame(yPos, newX, nHeight, wDif,1,lastIndex,current));
         }
-        stack.add(new StackFrame(yOffset, xOffset, nyLen, nxLen,0,lastIndex,current));
+        stack.add(new StackFrame(yPos, xPos, nHeight, nWidth,0,lastIndex,current));
         stack.remove(lastIndex);
     }
 
@@ -320,20 +320,20 @@ public class MyMatrixEncoder<E> implements MatrixEncoder<E>{
     }
 
     private static class StackFrame{
-        int yLen, xLen, xOffset, yOffset, quadrant, frameEnd;
+        int height, width, xPos, yPos, quadrant, frameEnd;
         StackFrame parent;
         private StackFrame(int yo, int xo, int yl, int xl, int q, int fr, StackFrame p){
-            yLen = yl;
-            xLen = xl;
-            xOffset = xo;
-            yOffset = yo;
+            height = yl;
+            width = xl;
+            xPos = xo;
+            yPos = yo;
             quadrant = q;
             frameEnd = fr;
             parent = p;
         }
 
         public String toString(){
-            return "("+quadrant+", "+yLen+", "+xLen+", "+yOffset+", "+xOffset+", "+frameEnd+")";
+            return "("+quadrant+", "+height+", "+width+", "+yPos+", "+xPos+", "+frameEnd+")";
         }
     }
 }
