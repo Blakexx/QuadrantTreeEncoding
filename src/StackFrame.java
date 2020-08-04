@@ -44,7 +44,7 @@ public class StackFrame{
     }
 
     private int getQuadrant(int r, int c){
-        return (r>=yPos+nHeight?2:0) + (c>=xPos+nHeight?1:0);
+        return (r>=yPos+nHeight?2:0) + (c>=xPos+nWidth?1:0);
     }
 
     private StackFrame getQuadrantFrame(int quadrant){
@@ -55,7 +55,7 @@ public class StackFrame{
             case 3 -> new StackFrame(newY, newX, hDif, wDif, this, 3);
             default -> null;
         };
-        if(returned!=null&&returned.size()==0){
+        if(returned==null||returned.size()==0){
             return null;
         }
         return returned;
