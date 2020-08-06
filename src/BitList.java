@@ -41,10 +41,9 @@ class BitList<E>{
             int dataBitIndex = i%bitsPerCon;
             freeBits = Math.min(toWrite-i,Math.min(bitsPerCon-dataBitIndex,bitsPerCon-bitIndex));
             int dataByte = bitData[dataConIndex]&255;
-            dataByte = dataByte>>>bitIndex;
-            int mask = (-128>>(freeBits-1));
-            mask&=255;
-            mask>>>=bitIndex;
+            dataByte>>>=bitIndex;
+            int mask = (Integer.MIN_VALUE>>(freeBits-1));
+            mask>>>=(32-bitsPerCon)+bitIndex;
             container[conIndex]&=~mask;
             container[conIndex]|=dataByte;
             bitData[dataConIndex]<<=freeBits;
@@ -83,9 +82,8 @@ class BitList<E>{
             int dataConIndex = i/bitsPerCon;
             int dataBitIndex = i%bitsPerCon;
             freeBits = Math.min(toWrite-i,Math.min(bitsPerCon-dataBitIndex,bitsPerCon-bitIndex));
-            int mask = (-128>>(freeBits-1));
-            mask&=255;
-            mask>>>=bitIndex;
+            int mask = (Integer.MIN_VALUE>>(freeBits-1));
+            mask>>>=(32-bitsPerCon)+bitIndex;
             int data = container[conIndex]&mask;
             data<<=bitIndex;
             data>>>=dataBitIndex;

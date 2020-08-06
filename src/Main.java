@@ -143,13 +143,13 @@ class Main {
         printProgressBar("Iterative writes",0,1,doPrint);
         long nanoTime = System.nanoTime();
         CachedTreeMatrix<Byte> toWrite = new CachedTreeMatrix<>(decoded,8,matrix.bitEncoder,matrix.bitDecoder,matrix.cachePercent);
-    /*
-    for(int r = 0; r<empty.length;r++){
-      for(int c = 0; c<empty[r].length;c++){
-        toWrite.set(r,c,(byte)0);
-      }
-    }
-    */
+        /*
+        for(int r = 0; r<empty.length;r++){
+          for(int c = 0; c<empty[r].length;c++){
+            toWrite.set(r,c,(byte)0);
+          }
+        }
+        */
         timeData[0] = (System.nanoTime()-nanoTime);
         boolean passed = equal(toWrite.toRawMatrix(),decoded);
         if(doPrint){
