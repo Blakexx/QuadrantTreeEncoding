@@ -18,7 +18,8 @@ public class LRUCache<K,V> implements CacheManager<K,V> {
     public void improveItem(K key){
         CacheLinkedList<Pair<K,V>>.ListNode val = lookup.get(key);
         if(val!=null){
-            controller.add(controller.remove(val));
+            val = controller.add(controller.remove(val));
+            lookup.put(key,val);
         }
     }
 

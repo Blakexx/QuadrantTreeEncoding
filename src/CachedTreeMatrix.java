@@ -91,7 +91,7 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         }else{
             if(encodedMatrix.getBit(dataIndex)){
                 int removed = bitsPerData();
-                int deleteStart = dataIndex+1, deleteEnd = dataIndex+bitsPerData()+1;
+                int deleteStart = dataIndex+1, deleteEnd = dataIndex+removed+1;
                 while(baseFrame.parent!=null){
                     baseFrame = baseFrame.parent;
                     int ignoreIndex = cacheQueue.getLast().value;
@@ -186,7 +186,11 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         if(frame.parent!=null&&frame.quadrant==0){
             return;
         }
-        cache.put(frameHash(frame),index);
+        if(index>=0){
+            cache.put(frameHash(frame),index);
+        }else{
+            cache.remove(frameHash(frame));
+        }
     }
 
     public E get(int r, int c){
