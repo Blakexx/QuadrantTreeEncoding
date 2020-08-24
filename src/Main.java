@@ -284,19 +284,19 @@ class Main {
         }
         String spaces = "----------";
         String lines = "==========";
-        double prog = (double)current/goal;
-        int progIndex = (int)(spaces.length()*prog);
-        int printEvery = Math.max(1,(int)Math.round(goal/100.0));
-        if(current%(printEvery)==0){
-            String progress;
-            if(progIndex>0&&progIndex<10){
-                progress = lines.substring(0,progIndex-1)+">";
-            }else{
-                progress = lines.substring(0,progIndex);
+            double prog = (double)current/goal;
+            int progIndex = (int)(spaces.length()*prog);
+            int printEvery = Math.max(1,(int)Math.round(goal/100.0));
+            if(current%(printEvery)==0){
+                String progress;
+                if(progIndex>0&&progIndex<10){
+                    progress = lines.substring(0,progIndex-1)+">";
+                }else{
+                    progress = lines.substring(0,progIndex);
+                }
+                progress+=spaces.substring(progIndex);
+                System.out.printf("\r"+name+" %"+progress.length()+"s %.0f%%",progress,100*prog);
             }
-            progress+=spaces.substring(progIndex);
-            System.out.printf("\r"+name+" %"+progress.length()+"s %.0f%%",progress,100*prog);
-        }
     }
 
     private static int readInt(String name, Scanner in, Function<Integer,Boolean> tester){
