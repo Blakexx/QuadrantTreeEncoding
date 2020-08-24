@@ -61,18 +61,71 @@ public class StackFrame{
         return returned;
     }
 
-    public StackFrame getChildContaining(int r, int c){
-        return getQuadrantFrame(getQuadrant(r,c));
+    private StackFrame nextParent(){
+        if(parent==null){
+            return null;
+        }
+        return parent.skipChildren();
     }
 
-    public static void pushFrame(LinkedList<StackFrame> stack){
-        StackFrame parent = stack.removeLast();
-        for(int q = 3; q>-1;q--){
-            StackFrame toAdd = parent.getQuadrantFrame(q);
-            if(toAdd!=null){
-                stack.add(toAdd);
+    public StackFrame getNext(){
+        if(size()<=1){
+            return skipChildren();
+        }
+        return getQuadrantFrame(0);
+    }
+
+    public StackFrame skipChildren(){
+        StackFrame sibling = nextSibling();
+        if(sibling==null){
+            return nextParent();
+        }
+        return sibling;
+    }
+
+    public StackFrame getSibling(int quadrant){
+        if(parent==null){
+            return null;
+        }
+        return parent.getQuadrantFrame(quadrant);
+    }
+
+    public StackFrame nextSibling(){
+        if(parent==null){
+            return null;
+        }
+        StackFrame returned = null;
+        for(int q = quadrant+1;q<4;q++){
+            returned = getSibling(q);
+            if(returned!=null){
+                break;
             }
         }
+        return returned;
+    }
+
+    public StackFrame prevSibling(){
+        if(parent==null){
+            return null;
+        }
+        StackFrame returned = null;
+        for(int q = quadrant-1;q>=0;q--){
+            returned = getSibling(q);
+            if(returned!=null){
+                break;
+            }
+        }
+        return returned;
+    }
+
+    public boolean contains(StackFrame other){
+        int thisYEnd = yPos + height, thisXEnd = xPos + width;
+        int otherYEnd = other.yPos + other.height, otherXEnd = other.xPos + other.width;
+        return other.xPos >= xPos && other.yPos >= yPos && otherYEnd <= thisYEnd && otherXEnd <= thisXEnd;
+    }
+
+    public StackFrame getChildContaining(int r, int c){
+        return getQuadrantFrame(getQuadrant(r,c));
     }
 
     private LinkedList<StackFrame> getChildrenInRange(int start, int end){

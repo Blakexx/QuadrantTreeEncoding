@@ -172,16 +172,14 @@ public class HybridMatrixEncoder<E> implements MatrixEncoder<E> {
         BiFunction<byte[],Integer,Integer> intDecoder = BitEncoders.intDecoder;
         int bitsPerData = input.readBits(8,intDecoder);
         V defaultItem = input.readBits(bitsPerData,decoder);
-        LinkedList<StackFrame> stack = new LinkedList<>();
         int heightBits = input.readBits(5,intDecoder)+1;
         int height = input.readBits(heightBits,intDecoder);
         int widthBits = input.readBits(5,intDecoder)+1;
         int width = input.readBits(widthBits,intDecoder);
-        stack.add(new StackFrame(0,0,height,width));
+        StackFrame current = new StackFrame(0,0,height,width);
         V[][] matrix = (V[][])new Object[height][width];
-        while(stack.size()>0&&input.hasNext()){
+        while(current!=null&&input.hasNext()){
             boolean nextInst = input.readBit();
-            StackFrame current = stack.getLast();
             boolean readMode = current.width<=1&&current.height<=1;
             if(nextInst){
                 if(!readMode&&input.readBit()){
@@ -199,18 +197,16 @@ public class HybridMatrixEncoder<E> implements MatrixEncoder<E> {
                         data = input.readBits(bitsPerData,decoder);
                         matrix[currentRow][currentCol] = data;
                     }
-                    stack.removeLast();
+                    current = current.skipChildren();
                 }else{
                     if(readMode){
                         V data = input.readBits(bitsPerData,decoder);
                         matrix[current.yPos][current.xPos] = data;
-                        stack.removeLast();
-                    }else{
-                        StackFrame.pushFrame(stack);
                     }
+                    current = current.getNext();
                 }
             }else{
-                stack.removeLast();
+                current = current.skipChildren();
             }
         }
         for(int r = 0; r<height;r++){

@@ -1,8 +1,5 @@
 import java.io.IOException;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.ListIterator;
-import java.util.NoSuchElementException;
+import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
@@ -102,10 +99,7 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
                         while(cacheQueue.getLast().key.parent==baseFrame){
                             cacheQueue.removeLast();
                         }
-                        LinkedList<StackFrame> frames = new LinkedList<>();
-                        frames.add(baseFrame);
-                        StackFrame.pushFrame(frames);
-                        for(StackFrame frame : frames){
+                        for(StackFrame frame : baseFrame.getChildren()){
                             putIntoCache(frame,-1);
                         }
                         removed+=children;
@@ -154,28 +148,24 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         return false;
     }
 
-    private MemoryController encodeChunk(StackFrame currentFrame, int r, int c, E data, int dataIndex){
+    private MemoryController encodeChunk(StackFrame baseFrame, int r, int c, E data, int dataIndex){
         MemoryController chunk = new MemoryController();
         MemoryController.MemoryBitOutputStream writer = chunk.outputStream();
-        LinkedList<StackFrame> frames = new LinkedList<>();
-        frames.add(currentFrame);
-        int parentIndex = dataIndex-getIndexFromCache(currentFrame,dataIndex-1);
-        while(frames.size()>0){
-            currentFrame = frames.getLast();
+        int parentIndex = dataIndex-getIndexFromCache(baseFrame,dataIndex-1);
+        StackFrame currentFrame = baseFrame;
+        while(currentFrame!=null&&baseFrame.contains(currentFrame)){
             if(currentFrame.contains(r,c)){
                 cacheQueue.add(new Pair<>(currentFrame,dataIndex-parentIndex));
                 parentIndex = dataIndex;
                 writer.writeBit(true);
-                if(currentFrame.size()==1){
+                if(currentFrame.size()<=1){
                     writer.writeBits(bitsPerData(),data,bitEncoder);
-                    frames.removeLast();
                     dataIndex+=bitsPerData();
-                }else{
-                    StackFrame.pushFrame(frames);
                 }
+                currentFrame = currentFrame.getNext();
             }else{
                 writer.writeBit(false);
-                frames.removeLast();
+                currentFrame = currentFrame.skipChildren();
             }
             dataIndex++;
         }
@@ -205,10 +195,9 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         return defaultItem();
     }
 
-    private Pair<StackFrame,Integer> decodeUntil(int r, int c, FrameCollection collection){
-        LinkedList<StackFrame> frames = collection.frames;
-        int dataIndex = collection.index;
-        StackFrame currentFrame = frames.getLast();
+    private Pair<StackFrame,Integer> decodeUntil(int r, int c, Pair<StackFrame,Integer> frameInfo){
+        int dataIndex = frameInfo.value;
+        StackFrame currentFrame = frameInfo.key;
         StackFrame goal = new StackFrame(r,c,1,1);
         int parentIndex = dataIndex-getIndexFromCache(currentFrame,dataIndex-1);
         while(dataIndex<encodedMatrix.size()&&!goal.equals(currentFrame)){
@@ -218,25 +207,22 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
             }
             if(encodedMatrix.getBit(dataIndex)){
                 if(currentFrame.size()<=1){
-                    frames.removeLast();
                     dataIndex+=bitsPerData();
-                }else{
-                    StackFrame.pushFrame(frames);
                 }
+                currentFrame = currentFrame.getNext();
             }else{
                 if(currentFrame.contains(goal.yPos,goal.xPos)){
                     return new Pair<>(currentFrame,dataIndex);
                 }
-                frames.removeLast();
+                currentFrame = currentFrame.skipChildren();
             }
             dataIndex++;
-            currentFrame = frames.getLast();
         }
         cacheQueue.add(new Pair<>(currentFrame,dataIndex-parentIndex));
         return new Pair<>(currentFrame,dataIndex);
     }
 
-    private FrameCollection getClosestIndexFromCache(int r, int c){
+    private Pair<StackFrame,Integer> getClosestIndexFromCache(int r, int c){
         StackFrame baseFrame = new StackFrame(0,0,height(),width());
         cacheQueue.add(new Pair<>(baseFrame,0));
         int dataIndex = headerSize();
@@ -246,34 +232,26 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
             if(cacheIndex!=-1){
                 dataIndex+=cacheIndex;
                 if(current.size()==1){
-                    LinkedList<StackFrame> toReturn = new LinkedList<>();
-                    toReturn.add(current);
-                    return new FrameCollection(dataIndex,toReturn);
+                    return new Pair<>(current,dataIndex);
                 }else{
                     cacheQueue.add(new Pair<>(current,cacheIndex));
                     baseFrame = current;
                 }
             }else{
-                LinkedList<StackFrame> toReturn = new LinkedList<>();
-                toReturn.add(current);
-                LinkedList<StackFrame> frames = baseFrame.getChildrenBefore(r,c);
-                ListIterator<StackFrame> iterator = frames.listIterator(frames.size());
-                while(iterator.hasPrevious()){
-                    StackFrame frame = iterator.previous();
-                    toReturn.add(frame);
-                    cacheIndex = getIndexFromCache(frame,dataIndex);
+                while(current.quadrant>0){
+                    current = current.prevSibling();
+                    cacheIndex = getIndexFromCache(current,dataIndex);
                     if(cacheIndex!=-1){
-                        cacheQueue.add(new Pair<>(frame,cacheIndex));
+                        cacheQueue.add(new Pair<>(current,cacheIndex));
                         dataIndex+=cacheIndex;
                         break;
                     }
                 }
                 if(cacheIndex==-1){
-                    toReturn = new LinkedList<>();
-                    toReturn.add(baseFrame);
                     cacheQueue.removeLast();
+                    return new Pair<>(baseFrame,dataIndex);
                 }
-                return new FrameCollection(dataIndex,toReturn);
+                return new Pair<>(current,dataIndex);
             }
         }
     }
@@ -346,37 +324,48 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         return Main.matrixToString(mat);
     }
 
-    private static class FrameCollection{
-        private final LinkedList<StackFrame> frames;
-        private final int index;
-        private FrameCollection(int index, LinkedList<StackFrame> frames){
-            this.index = index;
-            this.frames = frames;
-        }
-        public String toString(){
-            return index+" "+frames.toString();
-        }
+    public enum IteratorType{
+        BY_ROW,
+        BY_COL,
+        DEFAULT
     }
 
     public Iterator<DataPoint<E>> iterator(){
-        return new TreeIterator<>(this);
+        return iterator(IteratorType.DEFAULT);
+    }
+
+    public Iterator<DataPoint<E>> iterator(IteratorType type){
+        return iterator(0,0,height(),width(),type);
+    }
+
+    public Iterator<DataPoint<E>> iterator(int r, int c, int h, int w, IteratorType type){
+        StackFrame toIterate = new StackFrame(r,c,h,w);
+        if(type==IteratorType.DEFAULT){
+            return new TreeIterator<>(this, toIterate);
+        }
+        return new GenericIterator<>(this, toIterate,type);
     }
 
     private static class TreeIterator<V> implements Iterator<DataPoint<V>>{
 
         private final CachedTreeMatrix<V> matrix;
-        private int index, dataCount;
-        private final LinkedList<StackFrame> frames;
+        private int index, readCount, defaultsRead;
+        private StackFrame current;
+        private final StackFrame readFrame;
 
-        private TreeIterator(CachedTreeMatrix<V> matrix){
+        private TreeIterator(CachedTreeMatrix<V> matrix, StackFrame readFrame){
+            if(matrix==null||readFrame==null||!new StackFrame(0,0, matrix.height(), matrix.width()).contains(readFrame)){
+                throw new IllegalArgumentException("Illegal Arguments");
+            }
             this.matrix = matrix;
-            frames = new LinkedList<>();
-            frames.add(new StackFrame(0,0,matrix.height(),matrix.width()));
-            index = matrix.headerSize();
+            this.readFrame = readFrame;
+            Pair<StackFrame,Integer> frameInfo = matrix.getClosestIndexFromCache(readFrame.yPos,readFrame.xPos);
+            current = frameInfo.key;
+            index = frameInfo.value;
         }
 
         public boolean hasNext(){
-            return frames.size()>0;
+            return readCount<readFrame.size();
         }
 
         public DataPoint<V> next(){
@@ -384,79 +373,99 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
                 throw new NoSuchElementException("Iterator has no more elements");
             }
             MemoryController data = matrix.encodedMatrix;
-            StackFrame current = frames.getLast();
             while(true){
                 if(index>=data.size()||!data.getBit(index)){
-                    int prevCount = dataCount;
-                    dataCount++;
-                    if(dataCount==current.size()){
-                        dataCount = 0;
+                    int prevCount = defaultsRead;
+                    defaultsRead++;
+                    StackFrame prev = current;
+                    if(defaultsRead==current.size()){
+                        defaultsRead = 0;
                         index++;
-                        frames.removeLast();
+                        current = current.skipChildren();
                     }
-                    return new DataPoint<>(matrix.defaultItem(),current.yPos+prevCount/current.width,current.xPos+prevCount%current.width);
+                    if(readFrame.contains(prev)){
+                        readCount++;
+                        return new DataPoint<>(matrix.defaultItem(),prev.yPos+prevCount/prev.width,prev.xPos+prevCount%prev.width);
+                    }
                 }else{
                     index++;
                     if(current.size()==1){
                         V datum = data.getBits(index,matrix.bitsPerData(),matrix.bitDecoder);
-                        frames.removeLast();
                         index+=matrix.bitsPerData();
-                        return new DataPoint<>(datum,current.yPos,current.xPos);
+                        StackFrame prev = current;
+                        current = current.getNext();
+                        if(readFrame.contains(prev)){
+                            readCount++;
+                            return new DataPoint<>(datum,prev.yPos,prev.xPos);
+                        }
                     }else{
-                        StackFrame.pushFrame(frames);
+                        current = current.getNext();
                     }
                 }
-                current = frames.getLast();
             }
         }
-    }
-
-    public Iterator<DataPoint<E>> genericIterator(int startR, int startC, BiConsumer<Point,Point> incrementer, BiPredicate<Point,Point> nextChecker){
-        return new GenericIterator<>(this,startR,startC,incrementer, nextChecker);
     }
 
     private static class GenericIterator<V> implements Iterator<DataPoint<V>>{
 
-        private final Object[][] cache;
+        private final HashMap<Integer,V> cache;
         private final Iterator<DataPoint<V>> treeIterator;
-        private final BiConsumer<Point,Point> incrementer;
-        private final BiPredicate<Point,Point> nextChecker;
-        private final Point point, dimensions;
+        private int readCount, currentR, currentC;
+        private final StackFrame readFrame;
+        private final IteratorType type;
 
-        private GenericIterator(CachedTreeMatrix<V> matrix, int startR, int startC, BiConsumer<Point,Point> incrementer, BiPredicate<Point,Point> nextChecker){
-            if(matrix==null||incrementer==null){
-                throw new IllegalArgumentException("Cannot have null arguements");
+        private GenericIterator(CachedTreeMatrix<V> matrix, StackFrame readFrame, IteratorType type){
+            if(matrix==null||readFrame==null||type==null){
+                throw new IllegalArgumentException("Cannot have null arguments");
             }
-            treeIterator = matrix.iterator();
-            cache = new Byte[matrix.height()][matrix.width()];
-            this.incrementer = incrementer;
-            point = new Point(startR,startC);
-            dimensions = new Point(matrix.height(),matrix.width());
-            this.nextChecker = nextChecker;
+            treeIterator = matrix.iterator(readFrame.yPos,readFrame.xPos,readFrame.height,readFrame.width,IteratorType.DEFAULT);
+            cache = new HashMap<>();
+            this.readFrame = readFrame;
+            this.type = type;
+            currentR = readFrame.yPos;
+            currentC = readFrame.xPos;
         }
 
         public boolean hasNext(){
-            return nextChecker.test(point,dimensions);
+            return readCount<readFrame.size();
         }
 
         public DataPoint<V> next(){
             if(!hasNext()){
                 throw new NoSuchElementException("Iterator has no more elements");
             }
-            int currentR = point.row, currentC = point.column;
-            V data = (V)cache[currentR][currentC];
+            int rawIndex =  currentR * readFrame.width + currentC;
+            V data = cache.get(rawIndex);
             if(data==null){
                 while(treeIterator.hasNext()){
                     DataPoint<V> dataPoint = treeIterator.next();
-                    cache[dataPoint.row][dataPoint.column] = dataPoint.data;
-                    if(dataPoint.row==currentR&&dataPoint.column==currentC){
+                    int row = dataPoint.row;
+                    int col = dataPoint.column;
+                    if(row==currentR&&col==currentC){
                         data = dataPoint.data;
                         break;
                     }
+                    cache.put(row*readFrame.width+col, dataPoint.data);
+                }
+            }else{
+                cache.remove(rawIndex);
+            }
+            int prevR = currentR, prevC = currentC;
+            if(type==IteratorType.BY_ROW){
+                currentC++;
+                if(currentC==readFrame.xPos+readFrame.width){
+                    currentC = readFrame.xPos;
+                    currentR++;
+                }
+            }else if(type==IteratorType.BY_COL){
+                currentR++;
+                if(currentR==readFrame.yPos+readFrame.height){
+                    currentR = readFrame.yPos;
+                    currentC++;
                 }
             }
-            incrementer.accept(point,dimensions);
-            return new DataPoint<>(data,currentR,currentC);
+            readCount++;
+            return new DataPoint<>(data,prevR,prevC);
         }
     }
 }

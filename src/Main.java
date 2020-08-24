@@ -232,13 +232,7 @@ class Main {
         timeData[0]/=readCount;
         printProgressBar("Stride-1 reads",0,1,doPrint);
         readCount = 0;
-        iterator = matrix.genericIterator(0,0,(point, dimensions)->{
-            point.column++;
-            if(point.column==dimensions.column){
-                point.column = 0;
-                point.row++;
-            }
-        }, (point,dimensions)->point.row<dimensions.row&&point.column<dimensions.column&&point.column>-1&&point.row>-1);
+        iterator = matrix.iterator(50,50,50,50,CachedTreeMatrix.IteratorType.BY_ROW);
         while(iterator.hasNext()){
             nanoTime = System.nanoTime();
             DataPoint<Byte> point = iterator.next();

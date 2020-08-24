@@ -13,7 +13,7 @@ public class QuadrantTreeEncoder<E> implements MatrixEncoder<E> {
     private MemoryController controller;
     private MemoryController.MemoryBitOutputStream writer;
     private int refSize, dataSize, headerSize;
-    private int bitsPerData, longestX;
+    private int bitsPerData, longestX, remainingItems;
 
     public QuadrantTreeEncoder(E[][] m, int bitsPerData, BiFunction<E,Integer,byte[]> e, BiFunction<byte[],Integer,E> d){
         matrix = m;
@@ -59,30 +59,26 @@ public class QuadrantTreeEncoder<E> implements MatrixEncoder<E> {
         headerSize = 0;
         longestX = 0;
         HashMap<E,Integer> countMap = new HashMap<>();
+        int maxCount = 0, itemCount = 0;
+        defaultItem = null;
         for(int r = 0; r<matrix.length;r++){
             longestX = Math.max(longestX,matrix[r].length);
+            itemCount+=matrix[r].length;
             for(int c = 0; c<matrix[r].length;c++){
+                E item = matrix[r][c];
                 Integer val = countMap.get(matrix[r][c]);
                 if(val==null){
                     val = 0;
                 }
-                countMap.put(matrix[r][c], val+1);
+                if(++val > maxCount){
+                    maxCount = val;
+                    defaultItem = item;
+                }
+                countMap.put(matrix[r][c], val);
             }
         }
-        int maxCount = 0;
-        defaultItem = null;
-        for(E key : countMap.keySet()){
-            int count = countMap.get(key);
-            if(count>maxCount){
-                defaultItem = key;
-                maxCount = count;
-            }
-        }
-        for(int r = 0; r<matrix.length;r++){
-            for(int c = 0; c<matrix[r].length;c++){
-                dataSize+=!defaultItem.equals(matrix[r][c])?bitsPerData:0;
-            }
-        }
+        remainingItems = itemCount-maxCount;
+        dataSize = remainingItems*bitsPerData;
         BiFunction<Integer,Integer,byte[]> intEncoder = BitEncoders.intEncoder;
         writer.writeBits(8,bitsPerData,intEncoder);
         writer.writeBits(bitsPerData,defaultItem,encoder);
@@ -122,6 +118,7 @@ public class QuadrantTreeEncoder<E> implements MatrixEncoder<E> {
                 writer.writeBit(false);
                 return false;
             }
+            remainingItems--;
             writer.writeBit(true);
             writer.writeBits(bitsPerData,item,encoder);
             return true;
@@ -135,6 +132,10 @@ public class QuadrantTreeEncoder<E> implements MatrixEncoder<E> {
     }
 
     private boolean doPathSetup(StackFrame frame){
+        if(remainingItems==0){
+            writer.writeBit(false);
+            return false;
+        }
         int prevLength = controller.size();
         if(frame.size()>1){
             writer.writeBit(true);
@@ -155,34 +156,28 @@ public class QuadrantTreeEncoder<E> implements MatrixEncoder<E> {
         BiFunction<byte[],Integer,Integer> intDecoder = BitEncoders.intDecoder;
         int bitsPerData = input.readBits(8,intDecoder);
         V defaultItem = input.readBits(bitsPerData,decoder);
-        LinkedList<StackFrame> stack = new LinkedList<>();
         int heightBits = input.readBits(5,intDecoder)+1;
         int height = input.readBits(heightBits,intDecoder);
         int widthBits = input.readBits(5,intDecoder)+1;
         int width = input.readBits(widthBits,intDecoder);
-        stack.add(new StackFrame(0,0,height,width));
+        StackFrame current = new StackFrame(0,0,height,width);
         V[][] matrix = (V[][])new Object[height][width];
-        while(stack.size()>0&&input.hasNext()){
+        while(current!=null&&input.hasNext()){
             boolean nextInst = input.readBit();
-            StackFrame current = stack.getLast();
             boolean readMode = current.width<=1&&current.height<=1;;
             if(nextInst){
                 if(readMode){
                     V data = input.readBits(bitsPerData,decoder);
                     matrix[current.yPos][current.xPos] = data;
-                    stack.removeLast();
-                }else{
-                    StackFrame.pushFrame(stack);
                 }
+                current = current.getNext();
             }else{
-                stack.removeLast();
-            }
-        }
-        for(int r = 0; r<height;r++){
-            for(int c = 0; c<width;c++){
-                if(matrix[r][c]==null){
-                    matrix[r][c] = defaultItem;
+                for(int r = 0; r<current.height; r++){
+                    for (int c = 0; c<current.width; c++){
+                        matrix[current.yPos+r][current.xPos+c] = defaultItem;
+                    }
                 }
+                current = current.skipChildren();
             }
         }
         return matrix;
