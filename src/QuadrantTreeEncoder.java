@@ -44,6 +44,14 @@ public class QuadrantTreeEncoder<E> implements MatrixEncoder<E> {
         return refSize;
     }
 
+    public int dataSize(){
+        return dataSize;
+    }
+
+    public int headerSize(){
+        return headerSize;
+    }
+
     public void encodeMatrix(String path) throws IOException{
         encodeMatrix();
         byte[] bytes = controller.getBits(0,controller.size());

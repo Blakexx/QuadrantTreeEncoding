@@ -68,11 +68,24 @@ public class StackFrame{
         return parent.skipChildren();
     }
 
+    public StackFrame firstChild(){
+        return getQuadrantFrame(0);
+    }
+
+    public StackFrame lastChild(){
+        int count = 3;
+        StackFrame returned = getQuadrantFrame(count);
+        while(returned==null){
+            returned = getQuadrantFrame(--count);
+        }
+        return returned;
+    }
+
     public StackFrame getNext(){
         if(size()<=1){
             return skipChildren();
         }
-        return getQuadrantFrame(0);
+        return firstChild();
     }
 
     public StackFrame skipChildren(){

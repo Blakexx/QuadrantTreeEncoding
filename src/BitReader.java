@@ -5,6 +5,8 @@ public interface BitReader {
 
     boolean hasNext();
 
+    int totalRead();
+
     byte[] readBits(int num) throws IOException;
 
     <E> E readBits(int num, BiFunction<byte[], Integer, E> decoder) throws IOException;

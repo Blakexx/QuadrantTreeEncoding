@@ -5,6 +5,10 @@ public interface MatrixEncoder<E>{
 
     int refSize();
 
+    int dataSize();
+
+    int headerSize();
+
     void setMatrix(E[][] m);
 
     void setEncoder(BiFunction<E,Integer,byte[]> e);

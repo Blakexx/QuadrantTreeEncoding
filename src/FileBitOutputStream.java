@@ -4,8 +4,8 @@ import java.util.function.BiFunction;
 
 public class FileBitOutputStream implements BitWriter {
 
-    FileOutputStream output;
-    byte outputBuffer, outCount = 0;
+    private FileOutputStream output;
+    private byte outputBuffer, outCount = 0;
 
     public FileBitOutputStream(String path, boolean append) throws IOException{
         output = new FileOutputStream(path, append);

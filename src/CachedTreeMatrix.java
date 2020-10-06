@@ -1,8 +1,7 @@
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.util.*;
-import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
-import java.util.function.BiPredicate;
 
 public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
     private final MemoryController encodedMatrix;
@@ -26,6 +25,7 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         cacheQueue = new LinkedList<>();
         putIntoCache(baseFrame,0);
         trim();
+        nextRowInfo = getClosestIndexFromCache(0,0,false);
     }
 
     public CachedTreeMatrix(E[][] matrix, int bitsPerData, BiFunction<E,Integer,byte[]> bitEncoder, BiFunction<byte[],Integer,E> bitDecoder, double cachePercent){
@@ -65,7 +65,7 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         if(data==null||r<0||c<0||r>=height()||c>=width()){
             throw new IllegalArgumentException("Invalid parameters");
         }
-        Pair<StackFrame,Integer> frameInfo = decodeUntil(r,c,getClosestIndexFromCache(r,c));
+        Pair<StackFrame,Integer> frameInfo = decodeUntil(r,c,getClosestIndexFromCache(r,c,true));
         int dataIndex = frameInfo.value;
         StackFrame baseFrame = frameInfo.key;
         if(!defaultItem().equals(data)){
@@ -187,7 +187,7 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         if(r<0||c<0||r>=height()||c>=width()){
             throw new IllegalArgumentException("Invalid parameters");
         }
-        int dataIndex = decodeUntil(r,c,getClosestIndexFromCache(r,c)).value;
+        int dataIndex = decodeUntil(r,c,getClosestIndexFromCache(r,c,true)).value;
         cacheQueue();
         if(dataIndex<encodedMatrix.size()&&encodedMatrix.getBit(dataIndex)){
             return encodedMatrix.getBits(dataIndex+1,bitsPerData(),bitDecoder);
@@ -201,7 +201,8 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         StackFrame goal = new StackFrame(r,c,1,1);
         int parentIndex = dataIndex-getIndexFromCache(currentFrame,dataIndex-1);
         while(dataIndex<encodedMatrix.size()&&!goal.equals(currentFrame)){
-            if(currentFrame.contains(goal.yPos,goal.xPos)){
+            boolean contains = currentFrame.contains(goal.yPos,goal.xPos);
+            if(contains){
                 cacheQueue.add(new Pair<>(currentFrame,dataIndex-parentIndex));
                 parentIndex = dataIndex;
             }
@@ -222,9 +223,11 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         return new Pair<>(currentFrame,dataIndex);
     }
 
-    private Pair<StackFrame,Integer> getClosestIndexFromCache(int r, int c){
+    private Pair<StackFrame,Integer> getClosestIndexFromCache(int r, int c, boolean doCache){
         StackFrame baseFrame = new StackFrame(0,0,height(),width());
-        cacheQueue.add(new Pair<>(baseFrame,0));
+        if(doCache){
+            cacheQueue.add(new Pair<>(baseFrame,0));
+        }
         int dataIndex = headerSize();
         while(true){
             StackFrame current = baseFrame.getChildContaining(r,c);
@@ -234,7 +237,9 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
                 if(current.size()==1){
                     return new Pair<>(current,dataIndex);
                 }else{
-                    cacheQueue.add(new Pair<>(current,cacheIndex));
+                    if(doCache){
+                        cacheQueue.add(new Pair<>(current,cacheIndex));
+                    }
                     baseFrame = current;
                 }
             }else{
@@ -242,13 +247,17 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
                     current = current.prevSibling();
                     cacheIndex = getIndexFromCache(current,dataIndex);
                     if(cacheIndex!=-1){
-                        cacheQueue.add(new Pair<>(current,cacheIndex));
+                        if(doCache){
+                            cacheQueue.add(new Pair<>(current,cacheIndex));
+                        }
                         dataIndex+=cacheIndex;
                         break;
                     }
                 }
                 if(cacheIndex==-1){
-                    cacheQueue.removeLast();
+                    if(doCache){
+                        cacheQueue.removeLast();
+                    }
                     return new Pair<>(baseFrame,dataIndex);
                 }
                 return new Pair<>(current,dataIndex);
@@ -324,6 +333,71 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         return Main.matrixToString(mat);
     }
 
+    private int nextRow = 0;
+    private Pair<StackFrame,Integer> nextRowInfo;
+
+    public E[] getRow(int r, Class<E> type){
+        if(r<0||r>=height()){
+            throw new IllegalArgumentException("Invalid Dimensions");
+        }
+        E[] ret = bulkGet(r,0,1,width(),type,nextRow==r&&nextRowInfo!=null?nextRowInfo:getClosestIndexFromCache(r,0,false))[0];
+        nextRow++;
+        if(nextRow==height()){
+            nextRow = 0;
+            nextRowInfo = getClosestIndexFromCache(0,0,false);
+        }
+        return ret;
+    }
+
+    public E[][] bulkGet(int r, int c, int height, int width, Class<E> type){
+        StackFrame baseFrame = new StackFrame(0,0,height(),width());
+        StackFrame readFrame = new StackFrame(r,c,height,width);
+        if(!baseFrame.contains(readFrame)){
+            throw new IllegalArgumentException("Invalid Dimensions");
+        }
+        return bulkGet(r,c,height,width,type,getClosestIndexFromCache(r,c,false));
+    }
+
+    private E[][] bulkGet(int r, int c, int height, int width, Class<E> type,Pair<StackFrame,Integer> frameInfo){
+        StackFrame readFrame = new StackFrame(r,c,height,width);
+        E[][] container = (E[][])Array.newInstance(type,height,width);
+        StackFrame current = frameInfo.key;
+        int index = frameInfo.value;
+        int readCount = 0, toRead = height*width;
+        E defItem = defaultItem();
+        int bpd = bitsPerData();
+        while(readCount<toRead){
+            if(current.yPos==nextRow&&current.xPos==0){
+                nextRowInfo = new Pair<>(new StackFrame(current.yPos,current.xPos,current.height,current.width,current.parent,current.quadrant),index);
+            }
+            if(encodedMatrix.getBit(index)){
+                index++;
+                if(current.size()==1){
+                    int row = current.yPos, col = current.xPos;
+                    if(readFrame.contains(row,col)){
+                        E data = encodedMatrix.getBits(index,bpd,bitDecoder);
+                        container[row-r][col-c] = data;
+                        readCount++;
+                    }
+                    index+=bpd;
+                }
+                current = current.getNext();
+            }else{
+                index++;
+                int rStart = Math.max(r,current.yPos), rEnd = Math.min(r+height,current.yPos+current.height);
+                int cStart = Math.max(c,current.xPos), cEnd = Math.min(c+width,current.xPos+current.width);
+                readCount+=Math.max(0,(rEnd-rStart)*(cEnd-cStart));
+                for(;rStart<rEnd;rStart++){
+                    for(;cStart<cEnd;cStart++){
+                        container[rStart-r][cStart-c] = defItem;
+                    }
+                }
+                current = current.skipChildren();
+            }
+        }
+        return container;
+    }
+
     public enum IteratorType{
         BY_ROW,
         BY_COL,
@@ -359,7 +433,7 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
             }
             this.matrix = matrix;
             this.readFrame = readFrame;
-            Pair<StackFrame,Integer> frameInfo = matrix.getClosestIndexFromCache(readFrame.yPos,readFrame.xPos);
+            Pair<StackFrame,Integer> frameInfo = matrix.getClosestIndexFromCache(readFrame.yPos,readFrame.xPos,false);
             current = frameInfo.key;
             index = frameInfo.value;
         }

@@ -4,8 +4,9 @@ import java.util.function.BiFunction;
 
 public class FileBitInputStream implements BitReader{
 
-    FileInputStream input;
-    byte inputBuffer, inCount = 8;
+    private FileInputStream input;
+    private byte inputBuffer, inCount = 8;
+    private int totalRead;
 
     public FileBitInputStream(String path) throws IOException{
         input = new FileInputStream(path);
@@ -22,6 +23,10 @@ public class FileBitInputStream implements BitReader{
         return true;
     }
 
+    public int totalRead(){
+        return totalRead;
+    }
+
     public byte[] readBits(int num) throws IOException{
         byte[] bytes = new byte[(int)Math.ceil(num/8.0)];
         for(int i = 0; i<num;i++){
@@ -29,6 +34,7 @@ public class FileBitInputStream implements BitReader{
                 bytes[i/8] |= (byte)(128>>>(i%8));
             }
         }
+        totalRead+=num;
         return bytes;
     }
 
@@ -38,6 +44,7 @@ public class FileBitInputStream implements BitReader{
 
     public boolean readBit() throws IOException{
         prepareReadBuffer();
+        totalRead++;
         return (inputBuffer&(1<<7-inCount++))!=0;
     }
 

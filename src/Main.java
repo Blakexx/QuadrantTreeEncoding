@@ -1,9 +1,11 @@
+import javax.xml.crypto.Data;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.lang.reflect.Array;
 
 class Main {
     public static void main(String[] args) throws Throwable{
@@ -20,7 +22,8 @@ class Main {
         System.out.println("1: Custom Tester");
         System.out.println("2: Disk Size Tester");
         System.out.println("3: Read/Write Tester");
-        int type = readInt("Test Type",in,(i)->i>=1&&i<=3);
+        System.out.println("4: Multiplication Tester");
+        int type = readInt("Test Type",in,(i)->i>=1&&i<=4);
         System.out.println();
         if(type==1){
             MemoryController controller = customTester(encoder);
@@ -60,12 +63,133 @@ class Main {
                     dec
             ):encoder;
             matrixTester(encoder);
-        }else{
+        }else if(type==3){
             double fullness = readDouble("Fullness", in, (i)->i>=0&&i<=1);
             System.out.println();
             double cachePercent = readDouble("Cache %",in,(i)->i>=0&&i<=1);
             readWriteTester(fullness, cachePercent);
+        }else{
+            double full1 = readDouble("First Matrix Fullness",in,(i)->i>=0&&i<=1);
+            System.out.println();
+            double full2 = readDouble("Second Matrix Fullness",in,(i)->i>=0&&i<=1);
+            multiplyTester(full1,full2);
         }
+    }
+
+    public static void multiplyTester(double full1, double full2) throws IOException{
+        StringBuilder data = new StringBuilder("Rows Columns FirstFull SecondFull QTE_Multiply Default_Multiply");
+        System.out.println(data);
+        Random ran = new Random();
+        final double scale = Math.pow(10,9);
+        final int runsPerSize = 1;
+        for(int d = 16; d<=1024; d*=2){
+            double avgTreeTime = 0, avgRawTime = 0;
+            for(int k = 0; k<runsPerSize;k++){
+                Integer[][] firstRaw = generateMatrix(d,d,full1,(r,c)->ran.nextInt(),0,Integer.class);
+                CachedTreeMatrix<Integer> first = new CachedTreeMatrix<>(
+                        firstRaw,
+                        32,
+                        BitEncoders.intEncoder,
+                        BitEncoders.intDecoder,
+                        0
+                );
+                Integer[][] secondRaw = generateMatrix(d,d,full1,(r,c)->ran.nextInt(),0,Integer.class);
+                CachedTreeMatrix<Integer> second = new CachedTreeMatrix<>(
+                        firstRaw,
+                        32,
+                        BitEncoders.intEncoder,
+                        BitEncoders.intDecoder,
+                        0
+                );
+                long nanoTime = System.nanoTime();
+                //first.bulkGet(0,0,d,d,firstRaw);
+                //second.bulkGet(0,0,d,d,secondRaw);
+                int[][] res = bulkMultiply(first,second);
+                avgTreeTime+=System.nanoTime()-nanoTime;
+                /*
+                nanoTime = System.nanoTime();
+                int[][] res2 = multiply(firstRaw,secondRaw);
+                avgRawTime+=System.nanoTime()-nanoTime;
+                */
+            }
+            avgTreeTime/=runsPerSize*scale;
+            avgRawTime/=runsPerSize*scale;
+            StringBuilder tempString = new StringBuilder();
+            tempString.append(d).append(" ").append(d).append(" ").append(full1).append(" ").append(full2).append(" ").append(avgTreeTime).append(" ").append(avgRawTime);
+            System.out.println(tempString);
+            data.append(tempString);
+        }
+        PrintWriter pw = new PrintWriter(new File("multiplyData.txt"));
+        pw.write(data.toString());
+        pw.flush();
+    }
+
+    public static int[][] multiply(Integer[][] mat1, Integer[][] mat2){
+        if(mat1[0].length!=mat2.length){
+            throw new IllegalArgumentException("Invalid parameters");
+        }
+        int[][] res = new int[mat1.length][mat2[0].length];
+        for(int r = 0; r<mat1.length;r++){
+            for(int k = 0; k<mat1[r].length;k++){
+                int el = mat1[r][k];
+                for(int c = 0; c<mat2[k].length;c++){
+                    res[r][c]+=el*mat2[k][c];
+                }
+            }
+        }
+        return res;
+    }
+
+    public static int[][] bulkMultiply(CachedTreeMatrix<Integer> mat1, CachedTreeMatrix<Integer> mat2){
+        if(mat1.width()!=mat2.height()){
+            throw new IllegalArgumentException("Illegal Matrices");
+        }
+        int[][] res = new int[mat1.height()][mat2.width()];
+        Integer[] row;
+        Integer[] row2;
+        for(int r = 0; r<mat1.height();r++){
+            row = mat1.getRow(r,Integer.class);
+            for(int k = 0; k<row.length;k++){
+                int el = row[k];
+                row2 = mat2.getRow(k,Integer.class);
+                for(int c = 0; c<row2.length;c++){
+                    res[r][c]+=el*row2[c];
+                }
+            }
+        }
+        return res;
+    }
+
+    public static int[][] iteratorMultiply(CachedTreeMatrix<Integer> matrix1, CachedTreeMatrix<Integer> matrix2){
+        if(matrix1.width()!=matrix2.height()){
+            throw new IllegalArgumentException("Illegal Matrices");
+        }
+        int[][] res = new int[matrix1.height()][matrix2.width()];
+        Iterator<DataPoint<Integer>> firstIt = matrix1.iterator(CachedTreeMatrix.IteratorType.BY_COL);
+        Iterator<DataPoint<Integer>> secondIt = matrix2.iterator(CachedTreeMatrix.IteratorType.BY_ROW);
+        for(int k = 0; k<matrix1.width();k++){
+            Integer[] temp = new Integer[matrix2.width()];
+            for(int r = 0; r<matrix1.height();r++){
+                DataPoint<Integer> data = firstIt.next();
+                for(int c = 0; c<matrix2.width();c++){
+                    Integer second = temp[c];
+                    if(second==null){
+                        second = secondIt.next().data;
+                        temp[c] = second;
+                    }
+                    res[r][c]+=data.data*second;
+                }
+            }
+        }
+        return res;
+    }
+
+    public static int[][] naiveRecursive(CachedTreeMatrix<Integer> matrix1, CachedTreeMatrix<Integer> matrix2){
+        if(matrix1.width()!=matrix2.width()||matrix1.height()!=matrix2.height()||matrix1.height()!=matrix1.width()){
+            throw new IllegalArgumentException("Illegal Matrices");
+        }
+        int[][] returned = new int[matrix1.height()][matrix2.width()];
+        return returned;
     }
 
     public static void readWriteTester(double fullness, double cachePercent) throws IOException{
@@ -213,6 +337,7 @@ class Main {
         printProgressBar("Iterative reads",0,1,doPrint);
         int readCount = 0;
         long nanoTime;
+        /*
         Iterator<DataPoint<Byte>> iterator = matrix.iterator();
         while(iterator.hasNext()){
             nanoTime = System.nanoTime();
@@ -224,6 +349,19 @@ class Main {
             }
             printProgressBar("Iterative reads",++readCount,matrix.size(),doPrint);
         }
+        */
+        int height = matrix.height(), width = matrix.width();
+        readCount = height*width;
+        nanoTime = System.nanoTime();
+        Byte[][] container = matrix.bulkGet(0,0,height,width,Byte.class);
+        timeData[0] = System.nanoTime()-nanoTime;
+        for(int r = 0; r<height;r++){
+            for(int c = 0; c<width;c++){
+                if(!decoded[r][c].equals(container[r][c])){
+                    failCount++;
+                }
+            }
+        }
         didFail = failCount>0;
         if(doPrint){
             System.out.printf("\rIterative reads %s in %.3fs\n",failCount==0?"passed":"failed",timeData[0]/Math.pow(10,9));
@@ -232,7 +370,8 @@ class Main {
         timeData[0]/=readCount;
         printProgressBar("Stride-1 reads",0,1,doPrint);
         readCount = 0;
-        iterator = matrix.iterator(50,50,50,50,CachedTreeMatrix.IteratorType.BY_ROW);
+
+        Iterator<DataPoint<Byte>> iterator = matrix.iterator(CachedTreeMatrix.IteratorType.BY_ROW);
         while(iterator.hasNext()){
             nanoTime = System.nanoTime();
             DataPoint<Byte> point = iterator.next();
@@ -385,7 +524,12 @@ class Main {
         pw.flush();
     }
 
-    public static Byte[][] generateMatrix(int h, int w, double sparse) throws IOException{
+    public static Byte[][] generateMatrix(int h, int w, double sparse){
+        Random ran = new Random();
+        return generateMatrix(h,w,sparse,(r,c)->(byte)(ran.nextInt(127)+1),(byte)0, Byte.class);
+    }
+
+    public static <T> T[][] generateMatrix(int h, int w, double sparse, BiFunction<Integer,Integer,T> generator, T defaultVal, Class<T> type){
         int numItems = (int)Math.round(h*w*sparse);
         ArrayList<int[]> points = new ArrayList<>();
         for(int r = 0; r<h;r++){
@@ -394,23 +538,23 @@ class Main {
             }
         }
         Random ran = new Random();
-        Byte[][] matrix = new Byte[h][w];
+        T[][] matrix = (T[][])Array.newInstance(type,h,w);
         for(int i = 0; i<numItems;i++){
             int[] point = points.remove(ran.nextInt(points.size()));
-            matrix[point[0]][point[1]] = (byte)(ran.nextInt(127)+1);
+            matrix[point[0]][point[1]] = generator.apply(point[0],point[1]);
         }
         for(int[] point : points){
-            matrix[point[0]][point[1]] = 0;
+            matrix[point[0]][point[1]] = defaultVal;
         }
         return matrix;
     }
 
-    public static String matrixToString(Object[][] matrix){
+    public static <T> String matrixToString(T[][] matrix){
         String data = Arrays.deepToString(matrix);
         return data.substring(1,data.length()-1).replaceAll("\\], ","\\]\n");
     }
 
-    public static void printMatrix(Object[][] matrix){
+    public static <T> void printMatrix(T[][] matrix){
         System.out.println(matrixToString(matrix));
     }
 

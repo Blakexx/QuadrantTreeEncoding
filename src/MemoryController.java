@@ -150,6 +150,10 @@ public class MemoryController{
             return !closed&&readIndex<controller.size();
         }
 
+        public int totalRead(){
+            return readIndex;
+        }
+
         public void reset(){
             checkOpen();
             readIndex = 0;
