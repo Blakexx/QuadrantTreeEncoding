@@ -5,7 +5,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.function.BiFunction;
 
-public class HybridMatrixEncoder<E> implements MatrixEncoder<E> {
+public class DoubleHybridEncoder<E> implements MatrixEncoder<E> {
 
     private E[][] matrix;
     private BiFunction<E,Integer,byte[]> encoder;
@@ -16,11 +16,15 @@ public class HybridMatrixEncoder<E> implements MatrixEncoder<E> {
     private static int refSize, dataSize, headerSize;
     private int bitsPerData, longestX;
 
-    public HybridMatrixEncoder(E[][] m, int bitsPerData, BiFunction<E,Integer,byte[]> e, BiFunction<byte[],Integer,E> d){
+    public DoubleHybridEncoder(E[][] m, int bitsPerData, BiFunction<E,Integer,byte[]> e, BiFunction<byte[],Integer,E> d){
         matrix = m;
         encoder = e;
         decoder = d;
         this.bitsPerData = bitsPerData;
+    }
+
+    public String getName(){
+        return "DoubleH";
     }
 
     public void setMatrix(E[][] m){
@@ -159,25 +163,10 @@ public class HybridMatrixEncoder<E> implements MatrixEncoder<E> {
                 controller.delete(prevLength+1,controller.size());
                 writer.writeBit(false);
             }else{
-                int bitsPerRow = Main.logBaseCeil(frame.height,2), bitsPerCol = Main.logBaseCeil(frame.width,2);
                 int added = controller.size()-prevLength;
-                int crsSize = foundData.size()*(bitsPerRow+bitsPerCol+bitsPerData)+bitsPerRow+bitsPerCol+2;
                 int dataSize = frame.size()*bitsPerData+2;
-                if(added>crsSize){
+                if(added>=dataSize){
                     controller.delete(prevLength,controller.size());
-                    writer.writeBit(true);
-                    writer.writeBit(false);
-                    for(DataPoint<E> point : foundData){
-                        writer.writeBits(bitsPerRow,point.row-frame.yPos,BitEncoders.intEncoder);
-                        writer.writeBits(bitsPerCol,point.column-frame.xPos,BitEncoders.intEncoder);
-                        writer.writeBits(bitsPerData,point.data,encoder);
-                    }
-                    DataPoint<E> firstPoint = foundData.getFirst();
-                    writer.writeBits(bitsPerRow,firstPoint.row-frame.yPos,BitEncoders.intEncoder);
-                    writer.writeBits(bitsPerCol,firstPoint.column-frame.xPos,BitEncoders.intEncoder);
-                }else if(added>=dataSize){
-                    controller.delete(prevLength,controller.size());
-                    writer.writeBit(true);
                     writer.writeBit(true);
                     final int startBit = controller.size();
                     Iterator<DataPoint<E>> pointIter = foundData.iterator();
@@ -228,30 +217,11 @@ public class HybridMatrixEncoder<E> implements MatrixEncoder<E> {
         while(current!=null&&input.hasNext()){
             boolean readMode = current.width<=1&&current.height<=1;
             if(!readMode&&input.readBit()){
-                if(!input.readBit()){
-                    crsCount++;
-                    int bitsPerRow = Main.logBaseCeil(current.height,2), bitsPerCol = Main.logBaseCeil(current.width,2);
-                    int firstRow = input.readBits(bitsPerRow,intDecoder)+current.yPos;
-                    int firstCol = input.readBits(bitsPerCol,intDecoder)+current.xPos;
-                    V data = input.readBits(bitsPerData,decoder);
-                    matrix[firstRow][firstCol] = data;
-                    while(true){
-                        int currentRow = input.readBits(bitsPerRow,intDecoder)+current.yPos;
-                        int currentCol = input.readBits(bitsPerCol,intDecoder)+current.xPos;
-                        if(currentRow==firstRow&&currentCol==firstCol){
-                            break;
-                        }
-                        data = input.readBits(bitsPerData,decoder);
-                        matrix[currentRow][currentCol] = data;
+                unCount++;
+                for(int r = 0; r<current.height;r++){
+                    for(int c = 0; c<current.width; c++){
+                        matrix[current.yPos+r][current.xPos+c] = input.readBits(bitsPerData,decoder);
                         dataSize+=bitsPerData;
-                    }
-                }else{
-                    unCount++;
-                    for(int r = 0; r<current.height;r++){
-                        for(int c = 0; c<current.width; c++){
-                            matrix[current.yPos+r][current.xPos+c] = input.readBits(bitsPerData,decoder);
-                            dataSize+=bitsPerData;
-                        }
                     }
                 }
                 current = current.skipChildren();

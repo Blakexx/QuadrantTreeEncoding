@@ -1,6 +1,6 @@
 import java.util.function.BiFunction;
 
-public class MemoryController{
+public class MemoryController implements BitController{
 
     private BitList<Boolean> bits;
     private int size;
@@ -25,6 +25,14 @@ public class MemoryController{
             bits = newList;
         }
         size+=toAdd;
+    }
+
+    public void clear(){
+        size = 0;
+        bits = new BitList<>(8,1,
+                bitEncoder,
+                bitDecoder
+        );
     }
 
     public void delete(int start, int end){

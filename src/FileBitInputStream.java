@@ -1,5 +1,4 @@
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.function.BiFunction;
 
 public class FileBitInputStream implements BitReader{
@@ -7,6 +6,10 @@ public class FileBitInputStream implements BitReader{
     private FileInputStream input;
     private byte inputBuffer, inCount = 8;
     private int totalRead;
+
+    public FileBitInputStream(File file) throws IOException{
+        input = new FileInputStream(file);
+    }
 
     public FileBitInputStream(String path) throws IOException{
         input = new FileInputStream(path);

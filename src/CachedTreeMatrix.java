@@ -3,7 +3,7 @@ import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.BiFunction;
 
-public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
+public class CachedTreeMatrix<E> implements Matrix<E>{
     private final MemoryController encodedMatrix;
     private final CacheManager<Integer,Integer> cache;
     public final BiFunction<E,Integer,byte[]> bitEncoder;
@@ -40,8 +40,8 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
     public int estimateBitSize(){
         int cacheSize = 0, referenceSize = 32, intSize = 32;
         for(Integer key : cache.keySet()){
-            cacheSize+=referenceSize+referenceSize;
-            cacheSize+=referenceSize+intSize;
+            cacheSize+=intSize+referenceSize;
+            cacheSize+=intSize+intSize;
         }
         return encodedMatrix.size()+cacheSize;
     }
@@ -398,12 +398,6 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
         return container;
     }
 
-    public enum IteratorType{
-        BY_ROW,
-        BY_COL,
-        DEFAULT
-    }
-
     public Iterator<DataPoint<E>> iterator(){
         return iterator(IteratorType.DEFAULT);
     }
@@ -477,69 +471,6 @@ public class CachedTreeMatrix<E> implements Iterable<DataPoint<E>>{
                     }
                 }
             }
-        }
-    }
-
-    private static class GenericIterator<V> implements Iterator<DataPoint<V>>{
-
-        private final HashMap<Integer,V> cache;
-        private final Iterator<DataPoint<V>> treeIterator;
-        private int readCount, currentR, currentC;
-        private final StackFrame readFrame;
-        private final IteratorType type;
-
-        private GenericIterator(CachedTreeMatrix<V> matrix, StackFrame readFrame, IteratorType type){
-            if(matrix==null||readFrame==null||type==null){
-                throw new IllegalArgumentException("Cannot have null arguments");
-            }
-            treeIterator = matrix.iterator(readFrame.yPos,readFrame.xPos,readFrame.height,readFrame.width,IteratorType.DEFAULT);
-            cache = new HashMap<>();
-            this.readFrame = readFrame;
-            this.type = type;
-            currentR = readFrame.yPos;
-            currentC = readFrame.xPos;
-        }
-
-        public boolean hasNext(){
-            return readCount<readFrame.size();
-        }
-
-        public DataPoint<V> next(){
-            if(!hasNext()){
-                throw new NoSuchElementException("Iterator has no more elements");
-            }
-            int rawIndex =  currentR * readFrame.width + currentC;
-            V data = cache.get(rawIndex);
-            if(data==null){
-                while(treeIterator.hasNext()){
-                    DataPoint<V> dataPoint = treeIterator.next();
-                    int row = dataPoint.row;
-                    int col = dataPoint.column;
-                    if(row==currentR&&col==currentC){
-                        data = dataPoint.data;
-                        break;
-                    }
-                    cache.put(row*readFrame.width+col, dataPoint.data);
-                }
-            }else{
-                cache.remove(rawIndex);
-            }
-            int prevR = currentR, prevC = currentC;
-            if(type==IteratorType.BY_ROW){
-                currentC++;
-                if(currentC==readFrame.xPos+readFrame.width){
-                    currentC = readFrame.xPos;
-                    currentR++;
-                }
-            }else if(type==IteratorType.BY_COL){
-                currentR++;
-                if(currentR==readFrame.yPos+readFrame.height){
-                    currentR = readFrame.yPos;
-                    currentC++;
-                }
-            }
-            readCount++;
-            return new DataPoint<>(data,prevR,prevC);
         }
     }
 }

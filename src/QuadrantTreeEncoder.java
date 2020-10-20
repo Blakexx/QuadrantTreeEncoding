@@ -22,6 +22,10 @@ public class QuadrantTreeEncoder<E> implements MatrixEncoder<E> {
         this.bitsPerData = bitsPerData;
     }
 
+    public String getName(){
+        return "QTE";
+    }
+
     public void setMatrix(E[][] m){
         matrix = m;
     }
@@ -32,12 +36,6 @@ public class QuadrantTreeEncoder<E> implements MatrixEncoder<E> {
 
     public void setDecoder(BiFunction<byte[],Integer,E> d){
         decoder = d;
-    }
-
-    public void printAnalytics(){
-        System.out.println("Header size: "+headerSize+" bits");
-        System.out.println("Data size: "+dataSize+" bits");
-        System.out.println("Ref size: "+refSize+" bits");
     }
 
     public int refSize(){
@@ -91,8 +89,8 @@ public class QuadrantTreeEncoder<E> implements MatrixEncoder<E> {
         writer.writeBits(8,bitsPerData,intEncoder);
         writer.writeBits(bitsPerData,defaultItem,encoder);
         int height = matrix.length, width = longestX;
-        int heightBits = Integer.toString(height,2).length();
-        int widthBits = Integer.toString(width,2).length();
+        int heightBits = Main.logBaseCeil(height+1,2);
+        int widthBits = Main.logBaseCeil(width+1,2);
         writer.writeBits(5,heightBits-1,intEncoder);
         writer.writeBits(heightBits,height,intEncoder);
         writer.writeBits(5,widthBits-1,intEncoder);

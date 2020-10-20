@@ -15,15 +15,23 @@ public interface MatrixEncoder<E>{
 
     void setDecoder(BiFunction<byte[],Integer,E> d);
 
-    void printAnalytics();
+    default void printAnalytics(){
+        System.out.println("Header size: "+headerSize()+" bits");
+        System.out.println("Data size: "+dataSize()+" bits");
+        System.out.println("Ref size: "+refSize()+" bits");
+    }
 
     MemoryController encodeMatrix();
 
     void encodeMatrix(String path) throws IOException;
 
-    E[][] decodeMatrix(BitReader reader) throws IOException;
+    E[][] decodeMatrix(BitReader input) throws IOException;
 
-    static <V> V[][] decodeMatrix(BitReader reader, BiFunction<byte[],Integer,V> decoder) throws IOException{
+    static <V> V[][] decodeMatrix(BitReader input, BiFunction<byte[],Integer,V> decoder) throws IOException{
         throw new IOException("Not implemented");
+    }
+
+    default String getName(){
+        return "Matrix";
     }
 }

@@ -1,5 +1,4 @@
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.function.BiFunction;
 
 public class FileBitOutputStream implements BitWriter {
@@ -7,8 +6,13 @@ public class FileBitOutputStream implements BitWriter {
     private FileOutputStream output;
     private byte outputBuffer, outCount = 0;
 
+    public FileBitOutputStream(File file, boolean append) throws IOException{
+        file.createNewFile();
+        output = new FileOutputStream(file, append);
+    }
+
     public FileBitOutputStream(String path, boolean append) throws IOException{
-        output = new FileOutputStream(path, append);
+        this(new File(path),append);
     }
 
     public void writeBits(int length, byte[] bits) throws IOException{
