@@ -38,11 +38,12 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
     }
 
     public int estimateBitSize(){
-        int cacheSize = 0, referenceSize = 32, intSize = 32;
+        int cacheSize = 0;/*, referenceSize = 32, intSize = 32;
         for(Integer key : cache.keySet()){
             cacheSize+=intSize+referenceSize;
             cacheSize+=intSize+intSize;
         }
+        */
         return encodedMatrix.size()+cacheSize;
     }
 

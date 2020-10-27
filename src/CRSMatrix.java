@@ -126,7 +126,7 @@ public class CRSMatrix<E> implements Matrix<E> {
     private static class RowIterator<V> implements Iterator<DataPoint<V>>{
 
         private final CRSMatrix<V> matrix;
-        private int readCount, currentR, currentC, currentBit, rStart, rEndBit;
+        private int readCount, currentR, currentC, currentBit, rEndBit;
         private final int bitsPerSize;
         private final StackFrame readFrame;
 
@@ -139,7 +139,7 @@ public class CRSMatrix<E> implements Matrix<E> {
         }
 
         private void setUpRow(int row){
-            rStart = matrix.getOffset(row);
+            int rStart = matrix.getOffset(row);
             if(row==matrix.height()-1){
                 rEndBit = matrix.encodedMatrix.size();
             }else{
@@ -176,7 +176,7 @@ public class CRSMatrix<E> implements Matrix<E> {
             if(actualC==currentC){
                 currentBit+=matrix.bitsPerWidth();
                 data = encodedMatrix.getBits(currentBit, matrix.bitsPerData(),matrix.bitDecoder);
-                currentBit+= matrix.bitsPerData();
+                currentBit+=matrix.bitsPerData();
             }
             return new DataPoint<>(data,currentR,currentC++);
         }
