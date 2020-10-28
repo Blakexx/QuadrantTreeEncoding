@@ -1,5 +1,4 @@
 import java.io.File;
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.*;
 import java.util.function.BiFunction;
@@ -9,16 +8,7 @@ import java.util.function.*;
 import java.util.stream.*;
 
 class Main {
-    public static void main(String[] args) throws Throwable{
-        BiFunction<Byte, Integer, byte[]> enc = (num, bitsPerData)->new byte[]{(byte)(num<<(8-bitsPerData))};
-        BiFunction<byte[], Integer, Byte> dec = (bytes, bitsPerData)->(byte)(bytes[0]>>>(8-bitsPerData));
-        MatrixEncoder<Byte> encoder;
-        encoder = new QuadrantTreeEncoder<>(
-                null,
-                8,
-                enc,
-                dec
-        );
+    public static void main(String[] args){
         Scanner in = new Scanner(System.in);
         System.out.println("1: Disk Size Tester");
         System.out.println("2: Read Tester");
@@ -31,32 +21,53 @@ class Main {
             System.out.println("4: CRS");
             type = readInt("Encoding Type",in,(i)->i>=1&&i<=4);
             System.out.println();
-            encoder = type==2?new DoubleHybridEncoder<>(
-                    null,
-                    8,
-                    enc,
-                    dec
-            ):type==3?new TripleHybridEncoder<>(
-                    null,
-                    8,
-                    enc,
-                    dec
-            ):type==4?new CRSEncoder<>(
-                    null,
-                    8,
-                    enc,
-                    dec
-            ):encoder;
-            matrixTester(encoder);
+            diskSizeTester(getEncoder(type));
         }else if(type==2){
             System.out.println("1. QTE Matrix");
             System.out.println("2. CRS Matrix");
             type = readInt("Encoding Type",in,(i)->i>=1&&i<=2);
             System.out.println();
+            System.out.println("1. Memory");
+            System.out.println("2. Disk");
+            int loc = readInt("Data Location",in,(i)->i>=1&&i<=2);
+            System.out.println();
             double fullness = readDouble("Fullness", in, (i)->i>=0&&i<=1);
             double cachePercent = type==1?readDouble("Cache %",in,(i)->i>=0&&i<=1):0;
-            readWriteTester(fullness, cachePercent, type);
+            System.out.println();
+            readWriteTester(fullness, cachePercent, type, loc==2);
         }
+    }
+
+    private static MatrixEncoder<Byte> getEncoder(int type){
+        BiFunction<Byte, Integer, byte[]> enc = (num, bitsPerData)->new byte[]{(byte)(num<<(8-bitsPerData))};
+        BiFunction<byte[], Integer, Byte> dec = (bytes, bitsPerData)->(byte)(bytes[0]>>>(8-bitsPerData));
+        return switch(type){
+            case 1 -> new QuadrantTreeEncoder<>(
+                    null,
+                    8,
+                    enc,
+                    dec
+            );
+            case 2 -> new DoubleHybridEncoder<>(
+                    null,
+                    8,
+                    enc,
+                    dec
+            );
+            case 3 -> new TripleHybridEncoder<>(
+                    null,
+                    8,
+                    enc,
+                    dec
+            );
+            case 4 -> new CRSEncoder<>(
+                    null,
+                    8,
+                    enc,
+                    dec
+            );
+            default -> throw new IllegalArgumentException("Invalid Type");
+        };
     }
 
     private static long runTest(Consumer<Matrix<Byte>> test, Matrix<Byte> matrix){
@@ -65,28 +76,59 @@ class Main {
         return System.nanoTime()-time;
     }
 
-    private static Matrix<Byte> getByteMatrix(double fullness, double cachePercent, int r, int c, int type){
+    private static Matrix<Byte> getByteMatrix(double fullness, double cachePercent, int r, int c, int type, boolean onDisk){
+        if(type<1 || type>2){
+            throw new IllegalArgumentException("Invalid Type");
+        }
+        String fileName = type==1?"qte.matrix":"crs.matrix";
+        MemoryController controller = onDisk?new MemoryController(new File(fileName)):new MemoryController();
+        Byte[][] matrix = generateMatrix(r,c,fullness);
+        BiFunction<Byte, Integer, byte[]> encoder = (b,bpd)->new byte[]{b};
+        BiFunction<byte[], Integer, Byte> decoder = (b,bpd)->b[0];
+        MatrixEncoder<Byte> matrixEncoder = switch(type){
+            case 1 -> new QuadrantTreeEncoder<>(matrix,8,encoder,decoder);
+            case 2 -> new CRSEncoder<>(matrix,8,encoder,decoder);
+            default -> null;
+        };
+        matrixEncoder.encodeMatrix(controller);
         return switch(type){
             case 1 -> new CachedTreeMatrix<>(
-                    generateMatrix(r,c,fullness),
-                    8,
-                    (b,bpd)->new byte[]{b},
-                    (b,bpd)->b[0],
-                    cachePercent/*,
-                    new File("qte.matrix")*/
+                    controller,
+                    encoder,
+                    decoder,
+                    cachePercent
             );
             case 2 -> new CRSMatrix<>(
-                    generateMatrix(r,c,fullness),
-                    8,
-                    (b,bpd)->new byte[]{b},
-                    (b,bpd)->b[0]/*,
-                    new File("crs.matrix")*/
+                    controller,
+                    encoder,
+                    decoder
             );
-            default -> throw new IllegalArgumentException("Invalid Type");
+            default -> null;
         };
     }
 
-    public static void readWriteTester(double fullness, double cachePercent, int type) throws IOException{
+
+    /*
+    256 0.50 0.01 1373 2048 3 3 0 1 9
+    1024 0.50 0.01 5439 8192 1 3 0 4 22
+    4096 0.50 0.01 21629 32768 1 17 1 13 105
+    16384 0.50 0.01 86403 131072 4 113 3 103 274
+    65536 0.50 0.01 345493 524288 13 640 13 795 1212
+    262144 0.50 0.01 1381903 2097152 43 5243 48 6259 6794
+    1048576 0.50 0.01 5526389 8388608 166 41544 201 49632 42532
+    */
+
+    /*
+    256 0.50 0.00 1844 2048 4 2 0 2 2
+    1024 0.50 0.00 7558 8192 1 1 1 3 7
+    4096 0.50 0.00 31592 32768 2 2 3 16 36
+    16384 0.50 0.00 133034 131072 4 4 5 43 197
+    65536 0.50 0.00 561452 524288 18 17 19 211 1219
+    262144 0.50 0.00 2369070 2097152 43 45 75 1260 10105
+    1048576 0.50 0.00 9983024 8388608 166 183 303 8901 85023
+    */
+
+    public static void readWriteTester(double fullness, double cachePercent, int type, boolean onDisk){
         List<Consumer<Matrix<Byte>>> toRun = Arrays.asList(
                 Main::sequentialRowTest,
                 Main::randomRowTest,
@@ -103,7 +145,7 @@ class Main {
             long avgBits = 0;
             double[] timeData = new double[toRun.size()];
             for(int i = 0; i<runsPerSize;i++){
-                Matrix<Byte> matrix = getByteMatrix(fullness,cachePercent,dim,dim,type);
+                Matrix<Byte> matrix = getByteMatrix(fullness,cachePercent,dim,dim,type,onDisk);
                 avgBits+=matrix.estimateBitSize();
                 for(int r = 0; r<toRun.size();r++){
                     timeData[r]+=runTest(toRun.get(r),matrix);
@@ -115,20 +157,18 @@ class Main {
             for(int i = 0; i<timeData.length;i++){
                 timeData[i]/=runsPerSize;
                 timeData[i]/=scale;
-                tempString.append(" ").append(String.format("%.0f", timeData[i]));
+                tempString.append(" ").append(String.format("%.0f",timeData[i]));
             }
             System.out.println(tempString);
             tempString.append("\n");
             data.append(tempString);
         }
-        PrintWriter pw = new PrintWriter(new File("runtimeData.txt"));
-        pw.write(data.toString());
-        pw.flush();
-    }
-
-    private static void printIf(String toPrint, boolean doPrint){
-        if(doPrint){
-            System.out.println(toPrint);
+        try{
+            PrintWriter pw = new PrintWriter(new File("runtimeData.txt"));
+            pw.write(data.toString());
+            pw.flush();
+        }catch(Exception e){
+            throw new RuntimeException("Could not write to file");
         }
     }
 
@@ -209,15 +249,14 @@ class Main {
         return returned;
     }
 
-    public static void matrixTester(MatrixEncoder<Byte> encoder) throws IOException{
+    public static void diskSizeTester(MatrixEncoder<Byte> encoder){
         String formatName = encoder.getName();
-        StringBuilder data = new StringBuilder("Rows Columns Fullness "+formatName+"_Bits CRS_Bits Data_Bits Total_Bits Dense_Bits");
+        StringBuilder data = new StringBuilder("Rows Columns Fullness "+formatName+"_Bits Data_Bits Total_Bits Dense_Bits");
         System.out.println(data);
         data.append("\n");
         for(int d = 10; d<=1000;d*=10){
             Byte[][] matrix = null;
             for(double sparse = 0; sparse<=1;sparse+=sparse<=.09?.01:.1){
-                long avgCRS = 0;
                 long avgBits = 0;
                 long averageTotal = 0;
                 int runsPerSize = 3;
@@ -236,27 +275,33 @@ class Main {
                         return;
                     }
                     avgBits+=encoder.refSize();
-                    avgCRS+=estimateCRS(matrix);
                     averageTotal+=controller.size();
                 }
-                FileBitOutputStream stream = new FileBitOutputStream("dense/"+d+"x"+d+"-"+String.format("%.0f",sparse*100),false);
-                for(int r = 0; r<matrix.length;r++){
-                    for(int c = 0; c<matrix[r].length;c++){
-                        stream.writeBits(8,new byte[]{matrix[r][c]});
+                try{
+                    FileBitOutputStream stream = new FileBitOutputStream("dense/"+d+"x"+d+"-"+String.format("%.0f",sparse*100),false);
+                    for(int r = 0; r<matrix.length;r++){
+                        for(int c = 0; c<matrix[r].length;c++){
+                            stream.writeBits(8,new byte[]{matrix[r][c]});
+                        }
                     }
+                }catch(Exception e){
+                    throw new RuntimeException("Could not write to file");
                 }
                 avgBits/=runsPerSize;
-                avgCRS/=runsPerSize;
                 averageTotal/=runsPerSize;
-                String str = d+" "+d+" "+String.format("%.2f",sparse)+" "+avgBits+" "+avgCRS+" "+averageTotal+" "+(d*d*8);
+                String str = d+" "+d+" "+String.format("%.2f",sparse)+" "+avgBits+" "+averageTotal+" "+(d*d*8);
                 System.out.println(str);
                 str+="\n";
                 data.append(str);
             }
         }
-        PrintWriter pw = new PrintWriter(new File("diskData.txt"));
-        pw.write(data.toString());
-        pw.flush();
+        try{
+            PrintWriter pw = new PrintWriter(new File("diskData.txt"));
+            pw.write(data.toString());
+            pw.flush();
+        }catch(Exception e){
+            throw new RuntimeException("Could not write to file");
+        }
     }
 
     public static Byte[][] generateMatrix(int h, int w, double sparse){
@@ -293,57 +338,8 @@ class Main {
         System.out.println(matrixToString(matrix));
     }
 
-    public static int estimateCRS(Byte[][] matrix){
-        return estimateCRS1(matrix);
-    }
-
-    private static int estimateCRS1(Byte[][] matrix){
-        int data = 0, dataCount = 0;
-        int bitsPerColRef = logBaseCeil(matrix[0].length,2);
-        int bitsPerRowRef = logBaseCeil(matrix.length*matrix[0].length,2);
-        for(int i = 0; i<matrix.length;i++){
-            for(int j = 0; j<matrix[i].length;j++){
-                dataCount+=!matrix[i][j].equals((byte)0)?1:0;
-            }
-        }
-        data+=bitsPerColRef*dataCount;
-        data+=bitsPerRowRef*matrix.length;
-        return data;
-    }
-
-    private static int estimateCRS2(Byte[][] matrix){
-        int dataCount = 0;
-        int bitsPerColRef = logBaseCeil(matrix[0].length,2);
-        int bitsPerRowRef = logBaseCeil(matrix.length,2);
-        for(int i = 0; i<matrix.length;i++){
-            for(int j = 0; j<matrix[i].length;j++){
-                dataCount+=!matrix[i][j].equals((byte)0)?1:0;
-            }
-        }
-        return dataCount*(bitsPerRowRef+bitsPerColRef);
-    }
-
-    private static int estimateCRS3(Byte[][] matrix){
-        int data = 0;
-        int bitsPerColRef = logBaseCeil(matrix[0].length,2)+1;
-        int bitsPerRowRef = logBaseCeil(matrix.length,2)+1;
-        for(int i = 0; i<matrix.length;i++){
-            boolean hasData = false;
-            for(int j = 0; j<matrix[i].length;j++){
-                if(!matrix[i][j].equals((byte)0)){
-                    if(!hasData){
-                        hasData = true;
-                        data+=bitsPerRowRef;
-                    }
-                    data+=bitsPerColRef;
-                }
-            }
-        }
-        return data;
-    }
-
     public static int logBaseCeil(int num, int base){
-        return (int)Math.ceil(Math.log(num)/Math.log(base));
+        return (int)Math.ceil(logBase(num,base));
     }
 
     public static boolean equal(Object[][] matrix1, Object[][] matrix2){
@@ -359,5 +355,9 @@ class Main {
 
     public static int roundUpDiv(int num, int den){
         return (num + den - 1) / den;
+    }
+
+    public static double logBase(double num, double base){
+        return Math.log(num)/Math.log(base);
     }
 }

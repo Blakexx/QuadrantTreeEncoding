@@ -32,12 +32,13 @@ public class MemoryController{
                 bitEncoder,
                 bitDecoder
         );
-        newList.setMany(0,newSize,bits.getMany(0,newSize));
+        int toCopy = Math.min(size(),newSize);
+        newList.setMany(0,toCopy,bits.getMany(0,toCopy));
         if(!onDisk){
             bits = newList;
         }else{
             bits = makeList(newCapacity);
-            bits.setMany(0,newSize,newList.getMany(0,newSize));
+            bits.setMany(0,toCopy,newList.getMany(0,toCopy));
         }
         size = newSize;
     }
@@ -57,10 +58,16 @@ public class MemoryController{
     }
 
     private void ensureCapacity(int toAdd){
-        while(size()+toAdd>bits.length){
-            resize(size(),bits.length*2);
+        if(toAdd<=0){
+            return;
         }
-        size+=toAdd;
+        if(size() + toAdd <= bits.length){
+            size+=toAdd;
+            return;
+        }
+        int toMult = (int)Math.ceil(Main.logBase(size()+toAdd,2) - Main.logBase(bits.length,2));
+        toMult = 1<<toMult;
+        resize(size()+toAdd,bits.length*toMult);
     }
 
     public void clear(){
@@ -134,7 +141,7 @@ public class MemoryController{
 
     public static class MemoryBitOutputStream implements BitWriter{
 
-        private MemoryController controller;
+        private final MemoryController controller;
         private boolean closed = false;
 
         private MemoryBitOutputStream(MemoryController con){
@@ -173,7 +180,7 @@ public class MemoryController{
     public static class MemoryBitInputStream implements BitReader{
 
         private int readIndex;
-        private MemoryController controller;
+        private final MemoryController controller;
         private boolean closed = false;
 
         private MemoryBitInputStream(MemoryController con){
