@@ -13,7 +13,7 @@ public interface Matrix<E>{
     int width();
     int size();
 
-    E[][] toRawMatrix() throws IOException;
+    E[][] toRawMatrix();
 
     E[] getRow(int r, Class<E> type);
     E[][] bulkGet(int r, int c, int height, int width, Class<E> type);

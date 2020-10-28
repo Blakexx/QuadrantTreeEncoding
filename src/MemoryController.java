@@ -1,38 +1,71 @@
+import java.io.File;
 import java.util.function.BiFunction;
 
-public class MemoryController implements BitController{
+public class MemoryController{
 
     private BitList<Boolean> bits;
+    private final boolean onDisk;
+    private final File source;
     private int size;
-    private BiFunction<Boolean,Integer,byte[]> bitEncoder = (bool,len)->new byte[]{(byte)(bool?-128:0)};
-    private BiFunction<byte[],Integer,Boolean> bitDecoder = (bits,len)->bits[0]!=0;
+    private final BiFunction<Boolean,Integer,byte[]> bitEncoder = (bool,len)->new byte[]{(byte)(bool?-128:0)};
+    private final BiFunction<byte[],Integer,Boolean> bitDecoder = (bits,len)->bits[0]!=0;
 
-    public MemoryController(){
-        size = 0;
-        bits = new BitList<>(8,1,
+    private BitList<Boolean> makeList(int newSize){
+        if(!onDisk){
+            return new BitList<>(newSize, 1,
+                    bitEncoder,
+                    bitDecoder
+            );
+        }
+        return new BitList<>(newSize, 1,
+                bitEncoder,
+                bitDecoder,
+                source
+        );
+    }
+
+    private void resize(int newSize, int newCapacity){
+        if(newSize>newCapacity){
+            throw new IllegalArgumentException("Invalid Parameters");
+        }
+        BitList<Boolean> newList = new BitList<>(newCapacity,1,
                 bitEncoder,
                 bitDecoder
         );
+        newList.setMany(0,newSize,bits.getMany(0,newSize));
+        if(!onDisk){
+            bits = newList;
+        }else{
+            bits = makeList(newCapacity);
+            bits.setMany(0,newSize,newList.getMany(0,newSize));
+        }
+        size = newSize;
+    }
+
+    public MemoryController(){
+        onDisk = false;
+        source = null;
+        size = 0;
+        bits = makeList(8);
+    }
+
+    public MemoryController(File source){
+        onDisk = true;
+        this.source = source;
+        size = 0;
+        bits = makeList(8);
     }
 
     private void ensureCapacity(int toAdd){
         while(size()+toAdd>bits.length){
-            BitList<Boolean> newList = new BitList<>(bits.length*2,1,
-                    bitEncoder,
-                    bitDecoder
-            );
-            newList.setMany(0,size(),bits.getMany(0,size()));
-            bits = newList;
+            resize(size(),bits.length*2);
         }
         size+=toAdd;
     }
 
     public void clear(){
         size = 0;
-        bits = new BitList<>(8,1,
-                bitEncoder,
-                bitDecoder
-        );
+        bits = makeList(8);
     }
 
     public void delete(int start, int end){
@@ -94,7 +127,6 @@ public class MemoryController implements BitController{
     public <E> void setBits(int index, int length, E data, BiFunction<E, Integer, byte[]> encoder){
         setBits(index,length,encoder.apply(data,length));
     }
-
 
     public MemoryBitOutputStream outputStream(){
         return new MemoryBitOutputStream(this);
@@ -191,12 +223,7 @@ public class MemoryController implements BitController{
     }
 
     public void trim(){
-        BitList<Boolean> trimmed = new BitList<>(size(),1,
-                bitEncoder,
-                bitDecoder
-        );
-        trimmed.setMany(0,size(),bits.getMany(0,size()));
-        bits = trimmed;
+        resize(size(),size());
     }
 
     public String bitToString(int start){

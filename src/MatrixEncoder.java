@@ -21,14 +21,12 @@ public interface MatrixEncoder<E>{
         System.out.println("Ref size: "+refSize()+" bits");
     }
 
-    MemoryController encodeMatrix();
+    MemoryController encodeMatrix(MemoryController controller);
 
-    void encodeMatrix(String path) throws IOException;
+    E[][] decodeMatrix(MemoryController controller);
 
-    E[][] decodeMatrix(BitReader input) throws IOException;
-
-    static <V> V[][] decodeMatrix(BitReader input, BiFunction<byte[],Integer,V> decoder) throws IOException{
-        throw new IOException("Not implemented");
+    static <V> V[][] decodeMatrix(MemoryController controller, BiFunction<byte[],Integer,V> decoder){
+        throw new RuntimeException("Not implemented");
     }
 
     default String getName(){

@@ -57,15 +57,9 @@ public class TripleHybridEncoder<E> implements MatrixEncoder<E> {
         return headerSize;
     }
 
-    public void encodeMatrix(String path) throws IOException{
-        encodeMatrix();
-        byte[] bytes = controller.getBits(0,controller.size());
-        FileBitOutputStream fileWriter = new FileBitOutputStream(path,false);
-        fileWriter.writeBits(controller.size(),bytes);
-    }
-
-    public MemoryController encodeMatrix(){
-        controller = new MemoryController();
+    public MemoryController encodeMatrix(MemoryController controller){
+        controller.clear();
+        this.controller = controller;
         writer = controller.outputStream();
         refSize = 0;
         dataSize = 0;
@@ -212,11 +206,12 @@ public class TripleHybridEncoder<E> implements MatrixEncoder<E> {
         return foundData;
     }
 
-    public E[][] decodeMatrix(BitReader input) throws IOException{
-        return decodeMatrix(input,decoder);
+    public E[][] decodeMatrix(MemoryController controller){
+        return decodeMatrix(controller,decoder);
     }
 
-    public <V> V[][] decodeMatrix(BitReader input, BiFunction<byte[],Integer,V> decoder) throws IOException{
+    public <V> V[][] decodeMatrix(MemoryController controller, BiFunction<byte[],Integer,V> decoder){
+        MemoryController.MemoryBitInputStream input = controller.inputStream();
         BiFunction<byte[],Integer,Integer> intDecoder = BitEncoders.intDecoder;
         int bitsPerData = input.readBits(8,intDecoder);
         V defaultItem = input.readBits(bitsPerData,decoder);

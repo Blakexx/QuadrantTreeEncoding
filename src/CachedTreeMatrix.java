@@ -1,3 +1,4 @@
+import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.*;
@@ -34,7 +35,16 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
                 bitsPerData,
                 bitEncoder,
                 bitDecoder
-        ).encodeMatrix(),bitEncoder,bitDecoder,cachePercent);
+        ).encodeMatrix(new MemoryController()),bitEncoder,bitDecoder,cachePercent);
+    }
+
+    public CachedTreeMatrix(E[][] matrix, int bitsPerData, BiFunction<E,Integer,byte[]> bitEncoder, BiFunction<byte[],Integer,E> bitDecoder, double cachePercent, File source){
+        this(new QuadrantTreeEncoder<>(
+                matrix,
+                bitsPerData,
+                bitEncoder,
+                bitDecoder
+        ).encodeMatrix(new MemoryController(source)),bitEncoder,bitDecoder,cachePercent);
     }
 
     public int estimateBitSize(){
@@ -320,8 +330,8 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
         return height()*width();
     }
 
-    public E[][] toRawMatrix() throws IOException {
-        return QuadrantTreeEncoder.decodeMatrix(encodedMatrix.inputStream(),bitDecoder);
+    public E[][] toRawMatrix(){
+        return QuadrantTreeEncoder.decodeMatrix(encodedMatrix,bitDecoder);
     }
 
     public String toString(){
@@ -452,9 +462,11 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
                         index++;
                         current = current.skipChildren();
                     }
-                    if(readFrame.contains(prev)){
+                    int dataR = prev.yPos+prevCount/prev.width;
+                    int dataC = prev.xPos+prevCount%prev.width;
+                    if(readFrame.contains(dataR,dataC)){
                         readCount++;
-                        return new DataPoint<>(matrix.defaultItem(),prev.yPos+prevCount/prev.width,prev.xPos+prevCount%prev.width);
+                        return new DataPoint<>(matrix.defaultItem(),dataR,dataC);
                     }
                 }else{
                     index++;

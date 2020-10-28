@@ -1,3 +1,4 @@
+import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.function.BiFunction;
@@ -25,7 +26,16 @@ public class CRSMatrix<E> implements Matrix<E> {
                 bitsPerData,
                 bitEncoder,
                 bitDecoder
-        ).encodeMatrix(),bitEncoder,bitDecoder);
+        ).encodeMatrix(new MemoryController()),bitEncoder,bitDecoder);
+    }
+
+    public CRSMatrix(E[][] matrix, int bitsPerData, BiFunction<E,Integer,byte[]> bitEncoder, BiFunction<byte[],Integer,E> bitDecoder, File source){
+        this(new CRSEncoder<>(
+                matrix,
+                bitsPerData,
+                bitEncoder,
+                bitDecoder
+        ).encodeMatrix(new MemoryController(source)),bitEncoder,bitDecoder);
     }
 
     public int estimateBitSize() {
@@ -95,8 +105,8 @@ public class CRSMatrix<E> implements Matrix<E> {
         return height()*width();
     }
 
-    public E[][] toRawMatrix() throws IOException {
-        return CRSEncoder.decodeMatrix(encodedMatrix.inputStream(),bitDecoder);
+    public E[][] toRawMatrix(){
+        return CRSEncoder.decodeMatrix(encodedMatrix,bitDecoder);
     }
 
     public E[] getRow(int r, Class<E> type) {
@@ -164,19 +174,21 @@ public class CRSMatrix<E> implements Matrix<E> {
                 readCount++;
                 return new DataPoint<>(data,currentR,currentC++);
             }
-            int actualC = encodedMatrix.getBits(currentBit,matrix.bitsPerWidth(),matrix.intDecoder);
+            int bitsPerWidth = matrix.bitsPerWidth();
+            int bitsPerData = matrix.bitsPerData();
+            int actualC = encodedMatrix.getBits(currentBit,bitsPerWidth,matrix.intDecoder);
             while(currentC<readFrame.xPos){
-                if(actualC<readFrame.xPos&&currentBit<rEndBit){
-                    currentBit+=(matrix.bitsPerWidth()+matrix.bitsPerData());
-                    actualC = encodedMatrix.getBits(currentBit,matrix.bitsPerWidth(),matrix.intDecoder);
+                if(actualC<readFrame.xPos&&currentBit+(bitsPerData+bitsPerWidth)<rEndBit){
+                    currentBit+=(bitsPerWidth+bitsPerData);
+                    actualC = encodedMatrix.getBits(currentBit,bitsPerWidth,matrix.intDecoder);
                 }
                 currentC++;
             }
             readCount++;
             if(actualC==currentC){
-                currentBit+=matrix.bitsPerWidth();
-                data = encodedMatrix.getBits(currentBit, matrix.bitsPerData(),matrix.bitDecoder);
-                currentBit+=matrix.bitsPerData();
+                currentBit+=bitsPerWidth;
+                data = encodedMatrix.getBits(currentBit,bitsPerData,matrix.bitDecoder);
+                currentBit+=bitsPerData;
             }
             return new DataPoint<>(data,currentR,currentC++);
         }

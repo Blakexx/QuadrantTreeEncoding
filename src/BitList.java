@@ -1,8 +1,9 @@
+import java.io.File;
 import java.util.function.BiFunction;
 
 class BitList<E>{
 
-    public byte[] container;
+    private ByteArray container;
     public static final byte bitsPerCon = 8;
     private int bitsPerData;
     public final int length;
@@ -18,9 +19,23 @@ class BitList<E>{
         }
         this.length = length;
         this.bitsPerData = bitsPerData;
-        container = new byte[(int)Math.ceil(length*bitsPerData/(double)bitsPerCon)];
         this.bitEncoder = bitEncoder;
         this.bitDecoder = bitDecoder;
+        container = new MemoryByteArray(Main.roundUpDiv(length*bitsPerData,bitsPerCon));
+    }
+
+    public BitList(int length, int bitsPerData, BiFunction<E,Integer,byte[]> bitEncoder, BiFunction<byte[],Integer,E> bitDecoder, File source){
+        if(bitsPerData<0){
+            throw new IllegalArgumentException("BitsPerData must be >=0");
+        }
+        if(length<0){
+            throw new IllegalArgumentException("Length must be >=0");
+        }
+        this.length = length;
+        this.bitsPerData = bitsPerData;
+        this.bitEncoder = bitEncoder;
+        this.bitDecoder = bitDecoder;
+        container = new DiskByteArray(Main.roundUpDiv(length*bitsPerData,bitsPerCon),source);
     }
 
     public int bitsPerData(){
@@ -44,8 +59,10 @@ class BitList<E>{
             dataByte>>>=bitIndex;
             int mask = (Integer.MIN_VALUE>>(freeBits-1));
             mask>>>=(32-bitsPerCon)+bitIndex;
-            container[conIndex]&=~mask;
-            container[conIndex]|=dataByte;
+            byte data = container.get(conIndex);
+            data&=~mask;
+            data|=dataByte;
+            container.set(conIndex,data);
             bitData[dataConIndex]<<=freeBits;
             bitIndex+=freeBits;
         }
@@ -84,7 +101,7 @@ class BitList<E>{
             freeBits = Math.min(toWrite-i,Math.min(bitsPerCon-dataBitIndex,bitsPerCon-bitIndex));
             int mask = (Integer.MIN_VALUE>>(freeBits-1));
             mask>>>=(32-bitsPerCon)+bitIndex;
-            int data = container[conIndex]&mask;
+            int data = container.get(conIndex)&mask;
             data<<=bitIndex;
             data>>>=dataBitIndex;
             returned[dataConIndex]|=data;
@@ -113,8 +130,15 @@ class BitList<E>{
             for(int i = 0; i<length;i++){
                 newList.set(i,get(i));
             }
-            container = newList.container;
             bitsPerData = newDataSize;
+            if(container.getClass()==newList.container.getClass()){
+                container = newList.container;
+            }else{
+                container = new DiskByteArray(Main.roundUpDiv(length*bitsPerData,bitsPerCon),((DiskByteArray)container).source());
+                for(int i = 0; i<length;i++){
+                    set(i,newList.get(i));
+                }
+            }
         }
     }
 

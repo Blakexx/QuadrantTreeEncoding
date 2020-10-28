@@ -40,8 +40,8 @@ public class CRSEncoder<E> implements MatrixEncoder<E> {
         decoder = d;
     }
 
-    public MemoryController encodeMatrix() {
-        MemoryController controller = new MemoryController();
+    public MemoryController encodeMatrix(MemoryController controller) {
+        controller.clear();
         MemoryController.MemoryBitOutputStream writer = controller.outputStream();
         refSize = 0;
         dataSize = 0;
@@ -99,18 +99,12 @@ public class CRSEncoder<E> implements MatrixEncoder<E> {
         return controller;
     }
 
-    public void encodeMatrix(String path) throws IOException {
-        MemoryController bits = encodeMatrix();
-        byte[] bytes = bits.getBits(0,bits.size());
-        FileBitOutputStream fileWriter = new FileBitOutputStream(path,false);
-        fileWriter.writeBits(bits.size(),bytes);
+    public E[][] decodeMatrix(MemoryController controller){
+        return decodeMatrix(controller,decoder);
     }
 
-    public E[][] decodeMatrix(BitReader input) throws IOException {
-        return decodeMatrix(input,decoder);
-    }
-
-    public static <V> V[][] decodeMatrix(BitReader input, BiFunction<byte[],Integer,V> decoder) throws IOException{
+    public static <V> V[][] decodeMatrix(MemoryController controller, BiFunction<byte[],Integer,V> decoder){
+        MemoryController.MemoryBitInputStream input = controller.inputStream();
         BiFunction<byte[],Integer,Integer> intDecoder = BitEncoders.intDecoder;
         int bitsPerData = input.readBits(8,intDecoder);
         V defaultItem = input.readBits(bitsPerData,decoder);

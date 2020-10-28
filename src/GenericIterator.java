@@ -32,7 +32,7 @@ public class GenericIterator<V> implements Iterator<DataPoint<V>> {
         if(!hasNext()){
             throw new NoSuchElementException("Iterator has no more elements");
         }
-        int rawIndex =  currentR * readFrame.width + currentC;
+        int rawIndex = currentR * readFrame.width + currentC;
         V data = cache.get(rawIndex);
         if(data==null){
             while(defaultIterator.hasNext()){
