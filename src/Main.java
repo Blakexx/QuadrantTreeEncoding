@@ -31,10 +31,9 @@ class Main {
             System.out.println("2. Disk");
             int loc = readInt("Data Location",in,(i)->i>=1&&i<=2);
             System.out.println();
-            double fullness = readDouble("Fullness", in, (i)->i>=0&&i<=1);
             double cachePercent = type==1?readDouble("Cache %",in,(i)->i>=0&&i<=1):0;
             System.out.println();
-            readWriteTester(fullness, cachePercent, type, loc==2);
+            readWriteTester(cachePercent, type, loc==2);
         }
     }
 
@@ -128,7 +127,32 @@ class Main {
     1048576 0.50 0.00 9983024 8388608 166 183 303 8901 85023
     */
 
-    public static void readWriteTester(double fullness, double cachePercent, int type, boolean onDisk){
+    private static void runTests(List<Consumer<Matrix<Byte>>> toRun, int dim, double fullness, double cachePercent, int type, boolean onDisk, StringBuilder data){
+        final int runsPerTest = 1;
+        final double scale = Math.pow(10,6);
+        long avgBits = 0;
+        double[] timeData = new double[toRun.size()];
+        for(int i = 0; i<runsPerTest;i++){
+            Matrix<Byte> matrix = getByteMatrix(fullness,cachePercent,dim,dim,type,onDisk);
+            avgBits+=matrix.estimateBitSize();
+            for(int r = 0; r<toRun.size();r++){
+                timeData[r]+=runTest(toRun.get(r),matrix);
+            }
+        }
+        avgBits/=runsPerTest;
+        StringBuilder tempString = new StringBuilder();
+        tempString.append(dim*dim).append(" ").append(String.format("%.2f", fullness)).append(" ").append(String.format("%.2f", cachePercent)).append(" ").append(avgBits).append(" ").append(dim * dim * 8);
+        for(int i = 0; i<timeData.length;i++){
+            timeData[i]/=runsPerTest;
+            timeData[i]/=scale;
+            tempString.append(" ").append(String.format("%.0f",timeData[i]));
+        }
+        System.out.println(tempString);
+        tempString.append("\n");
+        data.append(tempString);
+    }
+
+    public static void readWriteTester(double cachePercent, int type, boolean onDisk){
         List<Consumer<Matrix<Byte>>> toRun = Arrays.asList(
                 Main::sequentialRowTest,
                 Main::randomRowTest,
@@ -136,32 +160,23 @@ class Main {
                 Main::randomColTest,
                 Main::randomTest
         );
-        StringBuilder data = new StringBuilder("Elements Fullness Cache_Size Total_Bits Dense_Bits SeqRow RanRow SeqCol RanCol Random");
-        System.out.println(data);
+        StringBuilder data = new StringBuilder();
+        String header = "Elements Fullness Cache_Size Total_Bits Dense_Bits SeqRow RanRow SeqCol RanCol Random";
+        System.out.println("Size Test:");
+        data.append("Size Test:\n");
+        data.append(header);
         data.append("\n");
-        double scale = Math.pow(10,6);
-        final int runsPerSize = 1;
+        System.out.println(header);
         for(int dim = 16; dim<=1024;dim*=2){
-            long avgBits = 0;
-            double[] timeData = new double[toRun.size()];
-            for(int i = 0; i<runsPerSize;i++){
-                Matrix<Byte> matrix = getByteMatrix(fullness,cachePercent,dim,dim,type,onDisk);
-                avgBits+=matrix.estimateBitSize();
-                for(int r = 0; r<toRun.size();r++){
-                    timeData[r]+=runTest(toRun.get(r),matrix);
-                }
-            }
-            avgBits/=runsPerSize;
-            StringBuilder tempString = new StringBuilder();
-            tempString.append(dim*dim).append(" ").append(String.format("%.2f", fullness)).append(" ").append(String.format("%.2f", cachePercent)).append(" ").append(avgBits).append(" ").append(dim * dim * 8);
-            for(int i = 0; i<timeData.length;i++){
-                timeData[i]/=runsPerSize;
-                timeData[i]/=scale;
-                tempString.append(" ").append(String.format("%.0f",timeData[i]));
-            }
-            System.out.println(tempString);
-            tempString.append("\n");
-            data.append(tempString);
+            runTests(toRun,dim,.3,cachePercent,type,onDisk,data);
+        }
+        System.out.println("\nFullness Test:");
+        data.append("\nFullness Test:\n");
+        data.append(header);
+        data.append("\n");
+        System.out.println(header);
+        for(double fullness = .1; fullness<=.5; fullness+=.1){
+            runTests(toRun,1024,fullness,cachePercent,type,onDisk,data);
         }
         try{
             PrintWriter pw = new PrintWriter(new File("runtimeData.txt"));
