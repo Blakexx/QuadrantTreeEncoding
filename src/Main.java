@@ -8,6 +8,10 @@ import java.util.function.*;
 import java.util.stream.*;
 
 class Main {
+
+    private static final double byteFactor = Math.pow(10,3); //Kilobytes
+    private static final double timeFactor = Math.pow(10,6); //Milliseconds
+
     public static void main(String[] args){
         Scanner in = new Scanner(System.in);
         System.out.println("1: Disk Size Tester");
@@ -108,7 +112,6 @@ class Main {
 
     private static void runTests(List<Consumer<Matrix<Byte>>> toRun, int dim, double fullness, double cachePercent, int type, boolean onDisk, StringBuilder data){
         final int runsPerTest = 1;
-        final double scale = Math.pow(10,6);
         long avgBits = 0;
         double[] timeData = new double[toRun.size()];
         for(int i = 0; i<runsPerTest;i++){
@@ -119,11 +122,13 @@ class Main {
             }
         }
         avgBits/=runsPerTest;
+        avgBits = roundUpDiv(avgBits,8);
+        double formatBits = avgBits/byteFactor;
         StringBuilder tempString = new StringBuilder();
-        tempString.append(dim*dim).append(" ").append(String.format("%.2f", fullness)).append(" ").append(String.format("%.2f", cachePercent)).append(" ").append(avgBits).append(" ").append(dim * dim * 8);
+        tempString.append(dim*dim).append(" ").append(String.format("%.2f", fullness)).append(" ").append(String.format("%.2f", cachePercent)).append(" ").append(String.format("%.2f",formatBits));
         for(int i = 0; i<timeData.length;i++){
             timeData[i]/=runsPerTest;
-            timeData[i]/=scale;
+            timeData[i]/=timeFactor;
             tempString.append(" ").append(String.format("%.0f",timeData[i]));
         }
         System.out.println(tempString);
@@ -140,7 +145,7 @@ class Main {
                 Main::randomTest
         );
         StringBuilder data = new StringBuilder();
-        String header = "Elements Fullness Cache_Size Total_Bits Dense_Bits SeqRow RanRow SeqCol RanCol Random";
+        String header = "Elements Fullness Cache_Size Total_Bits SeqRow RanRow SeqCol RanCol Random";
         System.out.println("Size Test:");
         data.append("Size Test:\n");
         data.append(header);
@@ -245,7 +250,7 @@ class Main {
 
     public static void diskSizeTester(MatrixEncoder<Byte> encoder){
         String formatName = encoder.getName();
-        StringBuilder data = new StringBuilder("Rows Columns Fullness "+formatName+"_Bits Data_Bits Total_Bits Dense_Bits");
+        StringBuilder data = new StringBuilder("Rows Columns Fullness "+formatName+"_Bits Data_Bits Total_Bits");
         System.out.println(data);
         data.append("\n");
         for(int d = 10; d<=1000;d*=10){
@@ -283,7 +288,9 @@ class Main {
                 }
                 avgBits/=runsPerSize;
                 averageTotal/=runsPerSize;
-                String str = d+" "+d+" "+String.format("%.2f",sparse)+" "+avgBits+" "+averageTotal+" "+(d*d*8);
+                avgBits = roundUpDiv(avgBits,8);
+                double formatBits = avgBits/byteFactor;
+                String str = d+" "+d+" "+String.format("%.2f",sparse)+" "+String.format("%.2f",formatBits)+" "+averageTotal;
                 System.out.println(str);
                 str+="\n";
                 data.append(str);
@@ -348,6 +355,10 @@ class Main {
     }
 
     public static int roundUpDiv(int num, int den){
+        return (num + den - 1) / den;
+    }
+
+    public static long roundUpDiv(long num, long den){
         return (num + den - 1) / den;
     }
 

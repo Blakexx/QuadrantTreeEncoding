@@ -1,5 +1,4 @@
 import java.io.File;
-import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.BiFunction;
@@ -9,7 +8,7 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
     private final CacheManager<Integer,Integer> cache;
     public final BiFunction<E,Integer,byte[]> bitEncoder;
     public final BiFunction<byte[],Integer,E> bitDecoder;
-    private final LinkedList<Pair<StackFrame,Integer>> cacheQueue;
+    private final LinkedList<Pair<Quadrant,Integer>> cacheQueue;
     private final BiFunction<Integer,Integer,byte[]> intEncoder;
     private final BiFunction<byte[],Integer,Integer> intDecoder;
     public final double cachePercent;
@@ -21,12 +20,26 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
         this.bitDecoder = bitDecoder;
         intEncoder = BitEncoders.intEncoder;
         intDecoder = BitEncoders.intDecoder;
-        StackFrame baseFrame = new StackFrame(0,0,height(),width());
+        int height = height();
+        int width = width();
+        Quadrant baseFrame = new Quadrant(0,0,height,width);
         cache = new LRUCache<>((int)Math.round(baseFrame.size()*cachePercent));
         cacheQueue = new LinkedList<>();
         putIntoCache(baseFrame,0);
         trim();
         nextRowInfo = getClosestIndexFromCache(0,0,false);
+        Pair<Quadrant,Integer> info = getClosestIndexFromCache(0,0,true);
+        info = decodeUntil(0,0,info);
+        for(int c = 0; c<width; c++){
+            info = decodeUntil(0,c,info);
+        }
+        cacheQueue();
+        info = getClosestIndexFromCache(0,0,true);
+        info = decodeUntil(0,0,info);
+        for(int r = 0; r<height;r++){
+            info = decodeUntil(r,0,info);
+        }
+        cacheQueue();
     }
 
     public CachedTreeMatrix(E[][] matrix, int bitsPerData, BiFunction<E,Integer,byte[]> bitEncoder, BiFunction<byte[],Integer,E> bitDecoder, double cachePercent){
@@ -63,7 +76,7 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
 
     private void cacheQueue(){
         while(cacheQueue.size()>0){
-            Pair<StackFrame,Integer> toCache = cacheQueue.removeLast();
+            Pair<Quadrant,Integer> toCache = cacheQueue.removeLast();
             if(toCache.value==null){
                 cache.improveItem(frameHash(toCache.key));
             }else{
@@ -76,9 +89,9 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
         if(data==null||r<0||c<0||r>=height()||c>=width()){
             throw new IllegalArgumentException("Invalid parameters");
         }
-        Pair<StackFrame,Integer> frameInfo = decodeUntil(r,c,getClosestIndexFromCache(r,c,true));
+        Pair<Quadrant,Integer> frameInfo = decodeUntil(r,c,getClosestIndexFromCache(r,c,true));
         int dataIndex = frameInfo.value;
-        StackFrame baseFrame = frameInfo.key;
+        Quadrant baseFrame = frameInfo.key;
         if(!defaultItem().equals(data)){
             if(encodedMatrix.getBit(dataIndex)){
                 encodedMatrix.setBits(dataIndex+1,bitsPerData(),data,bitEncoder);
@@ -88,7 +101,7 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
                 encodedMatrix.setBits(dataIndex,toAdd.size(),toAdd.getBits(0,toAdd.size()));
                 while(baseFrame.parent!=null){
                     baseFrame = baseFrame.parent;
-                    for(StackFrame frame : baseFrame.getChildrenAfter(r,c)){
+                    for(Quadrant frame : baseFrame.getChildrenAfter(r,c)){
                         int index = getIndexFromCache(frame,0);
                         if(index!=-1){
                             putIntoCache(frame,index+toAdd.size()-1);
@@ -110,7 +123,7 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
                         while(cacheQueue.getLast().key.parent==baseFrame){
                             cacheQueue.removeLast();
                         }
-                        for(StackFrame frame : baseFrame.getChildren()){
+                        for(Quadrant frame : baseFrame.getChildren()){
                             putIntoCache(frame,-1);
                         }
                         removed+=children;
@@ -121,7 +134,7 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
                 encodedMatrix.delete(deleteStart,deleteEnd);
                 encodedMatrix.setBit(deleteStart-1,false);
                 while(baseFrame!=null){
-                    for(StackFrame frame : baseFrame.getChildrenAfter(r,c)){
+                    for(Quadrant frame : baseFrame.getChildrenAfter(r,c)){
                         int index = getIndexFromCache(frame,0);
                         if(index!=-1){
                             putIntoCache(frame,index-removed);
@@ -140,7 +153,7 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
         System.out.println(encodedMatrix.bitToString(headerSize()));
     }
 
-    private boolean hasData(StackFrame frame, int ignore, int size, int parentIndex){
+    private boolean hasData(Quadrant frame, int ignore, int size, int parentIndex){
         if(!encodedMatrix.getBit(parentIndex)){
             return false;
         }
@@ -159,11 +172,11 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
         return false;
     }
 
-    private MemoryController encodeChunk(StackFrame baseFrame, int r, int c, E data, int dataIndex){
+    private MemoryController encodeChunk(Quadrant baseFrame, int r, int c, E data, int dataIndex){
         MemoryController chunk = new MemoryController();
         MemoryController.MemoryBitOutputStream writer = chunk.outputStream();
         int parentIndex = dataIndex-getIndexFromCache(baseFrame,dataIndex-1);
-        StackFrame currentFrame = baseFrame;
+        Quadrant currentFrame = baseFrame;
         while(currentFrame!=null&&baseFrame.contains(currentFrame)){
             if(currentFrame.contains(r,c)){
                 cacheQueue.add(new Pair<>(currentFrame,dataIndex-parentIndex));
@@ -183,7 +196,7 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
         return chunk;
     }
 
-    private void putIntoCache(StackFrame frame, int index){
+    private void putIntoCache(Quadrant frame, int index){
         if(frame.parent!=null&&frame.quadrant==0){
             return;
         }
@@ -206,10 +219,10 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
         return defaultItem();
     }
 
-    private Pair<StackFrame,Integer> decodeUntil(int r, int c, Pair<StackFrame,Integer> frameInfo){
+    private Pair<Quadrant,Integer> decodeUntil(int r, int c, Pair<Quadrant,Integer> frameInfo){
         int dataIndex = frameInfo.value;
-        StackFrame currentFrame = frameInfo.key;
-        StackFrame goal = new StackFrame(r,c,1,1);
+        Quadrant currentFrame = frameInfo.key;
+        Quadrant goal = new Quadrant(r,c,1,1);
         int parentIndex = dataIndex-getIndexFromCache(currentFrame,dataIndex-1);
         while(dataIndex<encodedMatrix.size()&&!goal.equals(currentFrame)){
             boolean contains = currentFrame.contains(goal.yPos,goal.xPos);
@@ -234,14 +247,14 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
         return new Pair<>(currentFrame,dataIndex);
     }
 
-    private Pair<StackFrame,Integer> getClosestIndexFromCache(int r, int c, boolean doCache){
-        StackFrame baseFrame = new StackFrame(0,0,height(),width());
+    private Pair<Quadrant,Integer> getClosestIndexFromCache(int r, int c, boolean doCache){
+        Quadrant baseFrame = new Quadrant(0,0,height(),width());
         if(doCache){
             cacheQueue.add(new Pair<>(baseFrame,0));
         }
         int dataIndex = headerSize();
         while(true){
-            StackFrame current = baseFrame.getChildContaining(r,c);
+            Quadrant current = baseFrame.getChildContaining(r,c);
             int cacheIndex = getIndexFromCache(current,dataIndex);
             if(cacheIndex!=-1){
                 dataIndex+=cacheIndex;
@@ -276,7 +289,7 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
         }
     }
 
-    private int getIndexFromCache(StackFrame frame, int parentIndex, boolean doCache){
+    private int getIndexFromCache(Quadrant frame, int parentIndex, boolean doCache){
         int hash = frameHash(frame);
         if(doCache){
             cache.improveItem(hash);
@@ -290,11 +303,11 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
         return index!=null?index:-1;
     }
 
-    private int frameHash(StackFrame frame){
+    private int frameHash(Quadrant frame){
         return frame.yPos*width()+frame.xPos;
     }
 
-    private int getIndexFromCache(StackFrame frame, int parentIndex){
+    private int getIndexFromCache(Quadrant frame, int parentIndex){
         return getIndexFromCache(frame,parentIndex,false);
     }
 
@@ -345,7 +358,7 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
     }
 
     private int nextRow = 0;
-    private Pair<StackFrame,Integer> nextRowInfo;
+    private Pair<Quadrant,Integer> nextRowInfo;
 
     public E[] getRow(int r, Class<E> type){
         if(r<0||r>=height()){
@@ -361,25 +374,25 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
     }
 
     public E[][] bulkGet(int r, int c, int height, int width, Class<E> type){
-        StackFrame baseFrame = new StackFrame(0,0,height(),width());
-        StackFrame readFrame = new StackFrame(r,c,height,width);
+        Quadrant baseFrame = new Quadrant(0,0,height(),width());
+        Quadrant readFrame = new Quadrant(r,c,height,width);
         if(!baseFrame.contains(readFrame)){
             throw new IllegalArgumentException("Invalid Dimensions");
         }
         return bulkGet(r,c,height,width,type,getClosestIndexFromCache(r,c,false));
     }
 
-    private E[][] bulkGet(int r, int c, int height, int width, Class<E> type,Pair<StackFrame,Integer> frameInfo){
-        StackFrame readFrame = new StackFrame(r,c,height,width);
+    private E[][] bulkGet(int r, int c, int height, int width, Class<E> type,Pair<Quadrant,Integer> frameInfo){
+        Quadrant readFrame = new Quadrant(r,c,height,width);
         E[][] container = (E[][])Array.newInstance(type,height,width);
-        StackFrame current = frameInfo.key;
+        Quadrant current = frameInfo.key;
         int index = frameInfo.value;
         int readCount = 0, toRead = height*width;
         E defItem = defaultItem();
         int bpd = bitsPerData();
         while(readCount<toRead){
             if(current.yPos==nextRow&&current.xPos==0){
-                nextRowInfo = new Pair<>(new StackFrame(current.yPos,current.xPos,current.height,current.width,current.parent,current.quadrant),index);
+                nextRowInfo = new Pair<>(new Quadrant(current.yPos,current.xPos,current.height,current.width,current.parent,current.quadrant),index);
             }
             if(encodedMatrix.getBit(index)){
                 index++;
@@ -418,7 +431,7 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
     }
 
     public Iterator<DataPoint<E>> iterator(int r, int c, int h, int w, IteratorType type){
-        StackFrame toIterate = new StackFrame(r,c,h,w);
+        Quadrant toIterate = new Quadrant(r,c,h,w);
         if(type==IteratorType.DEFAULT){
             return new TreeIterator<>(this, toIterate);
         }
@@ -429,16 +442,19 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
 
         private final CachedTreeMatrix<V> matrix;
         private int index, readCount, defaultsRead;
-        private StackFrame current;
-        private final StackFrame readFrame;
+        private Quadrant current;
+        private final Quadrant readFrame;
 
-        private TreeIterator(CachedTreeMatrix<V> matrix, StackFrame readFrame){
-            if(matrix==null||readFrame==null||!new StackFrame(0,0, matrix.height(), matrix.width()).contains(readFrame)){
+        private TreeIterator(CachedTreeMatrix<V> matrix, Quadrant readFrame){
+            if(matrix==null||readFrame==null||!new Quadrant(0,0, matrix.height(), matrix.width()).contains(readFrame)){
                 throw new IllegalArgumentException("Illegal Arguments");
             }
             this.matrix = matrix;
             this.readFrame = readFrame;
-            Pair<StackFrame,Integer> frameInfo = matrix.getClosestIndexFromCache(readFrame.yPos,readFrame.xPos,false);
+            int r = readFrame.yPos, c = readFrame.xPos;
+            Pair<Quadrant,Integer> frameInfo = matrix.getClosestIndexFromCache(r,c,true);
+            frameInfo = matrix.decodeUntil(r,c,frameInfo);
+            matrix.cacheQueue();
             current = frameInfo.key;
             index = frameInfo.value;
         }
@@ -456,7 +472,7 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
                 if(index>=data.size()||!data.getBit(index)){
                     int prevCount = defaultsRead;
                     defaultsRead++;
-                    StackFrame prev = current;
+                    Quadrant prev = current;
                     if(defaultsRead==current.size()){
                         defaultsRead = 0;
                         index++;
@@ -473,7 +489,7 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
                     if(current.size()==1){
                         V datum = data.getBits(index,matrix.bitsPerData(),matrix.bitDecoder);
                         index+=matrix.bitsPerData();
-                        StackFrame prev = current;
+                        Quadrant prev = current;
                         current = current.getNext();
                         if(readFrame.contains(prev)){
                             readCount++;

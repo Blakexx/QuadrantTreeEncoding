@@ -1,5 +1,4 @@
 import java.io.File;
-import java.io.IOException;
 import java.util.Iterator;
 import java.util.function.BiFunction;
 
@@ -126,7 +125,7 @@ public class CRSMatrix<E> implements Matrix<E> {
     }
 
     public Iterator<DataPoint<E>> iterator(int r, int c, int h, int w, IteratorType type){
-        StackFrame toIterate = new StackFrame(r,c,h,w);
+        Quadrant toIterate = new Quadrant(r,c,h,w);
         if(type==IteratorType.DEFAULT){
             return new RowIterator<>(this, toIterate);
         }
@@ -138,9 +137,9 @@ public class CRSMatrix<E> implements Matrix<E> {
         private final CRSMatrix<V> matrix;
         private int readCount, currentR, currentC, currentBit, rEndBit;
         private final int bitsPerSize;
-        private final StackFrame readFrame;
+        private final Quadrant readFrame;
 
-        private RowIterator(CRSMatrix<V> matrix, StackFrame readFrame){
+        private RowIterator(CRSMatrix<V> matrix, Quadrant readFrame){
             this.matrix = matrix;
             this.readFrame = readFrame;
             bitsPerSize = Main.logBaseCeil(matrix.size()+1,2);

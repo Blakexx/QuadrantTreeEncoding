@@ -6,10 +6,10 @@ public class GenericIterator<V> implements Iterator<DataPoint<V>> {
     private final HashMap<Integer,V> cache;
     private final Iterator<DataPoint<V>> defaultIterator;
     private int readCount, currentR, currentC;
-    private final StackFrame readFrame;
+    private final Quadrant readFrame;
     private final IteratorType type;
 
-    public GenericIterator(Matrix<V> matrix, StackFrame readFrame, IteratorType type){
+    public GenericIterator(Matrix<V> matrix, Quadrant readFrame, IteratorType type){
         if(matrix==null||readFrame==null||type==null){
             throw new IllegalArgumentException("Cannot have null arguments");
         }

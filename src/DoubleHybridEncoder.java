@@ -1,5 +1,3 @@
-import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -104,7 +102,7 @@ public class DoubleHybridEncoder<E> implements MatrixEncoder<E> {
         writer.writeBits(widthBits,width,intEncoder);
         //headerSize=8+bitsPerData+5+heightBits+5+widthBits;
         if((longestX>1||matrix.length>1)&&(maxCount!=totalCount)){
-            doPathSetup(new StackFrame(0,0,height,width));
+            doPathSetup(new Quadrant(0,0,height,width));
             //controller.delete(lastData,controller.size());
         }else{
             writer.writeBit(false);
@@ -115,7 +113,7 @@ public class DoubleHybridEncoder<E> implements MatrixEncoder<E> {
         return controller;
     }
 
-    private LinkedList<DataPoint<E>> encodeHelper(StackFrame frame){
+    private LinkedList<DataPoint<E>> encodeHelper(Quadrant frame){
         int yPos = frame.yPos, xPos = frame.xPos;
         LinkedList<DataPoint<E>> foundData = new LinkedList<>();
         if(yPos>=matrix.length){
@@ -137,14 +135,14 @@ public class DoubleHybridEncoder<E> implements MatrixEncoder<E> {
             writer.writeBits(bitsPerData,item,encoder);
             foundData.add(new DataPoint<>(item,yPos,xPos));
         }else{
-            for(StackFrame child : frame.getChildren()){
+            for(Quadrant child : frame.getChildren()){
                 foundData.addAll(doPathSetup(child));
             }
         }
         return foundData;
     }
 
-    private LinkedList<DataPoint<E>> doPathSetup(StackFrame frame){
+    private LinkedList<DataPoint<E>> doPathSetup(Quadrant frame){
         int prevLength = controller.size();
         if(frame.size()>1){
             writer.writeBit(false);
@@ -205,7 +203,7 @@ public class DoubleHybridEncoder<E> implements MatrixEncoder<E> {
         int width = input.readBits(widthBits,intDecoder);
         headerSize=8+bitsPerData+5+heightBits+5+widthBits;
         dataSize = 0;
-        StackFrame current = new StackFrame(0,0,height,width);
+        Quadrant current = new Quadrant(0,0,height,width);
         V[][] matrix = (V[][])new Object[height][width];
         double crsCount = 0, unCount = 0, qteCount = 0;
         while(current!=null&&input.hasNext()){

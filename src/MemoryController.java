@@ -4,8 +4,8 @@ import java.util.function.BiFunction;
 public class MemoryController{
 
     private BitList<Boolean> bits;
-    private final boolean onDisk;
-    private final File source;
+    public final boolean onDisk;
+    public final File source;
     private int size;
     private final BiFunction<Boolean,Integer,byte[]> bitEncoder = (bool,len)->new byte[]{(byte)(bool?-128:0)};
     private final BiFunction<byte[],Integer,Boolean> bitDecoder = (bits,len)->bits[0]!=0;

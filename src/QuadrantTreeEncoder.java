@@ -1,7 +1,4 @@
-import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.function.BiFunction;
 
 public class QuadrantTreeEncoder<E> implements MatrixEncoder<E> {
@@ -91,7 +88,7 @@ public class QuadrantTreeEncoder<E> implements MatrixEncoder<E> {
         writer.writeBits(widthBits,width,intEncoder);
         headerSize=8+bitsPerData+5+heightBits+5+widthBits;
         if((longestX>1||matrix.length>1)&&dataSize>0){
-            doPathSetup(new StackFrame(0,0,height,width));
+            doPathSetup(new Quadrant(0,0,height,width));
             //controller.delete(lastData,controller.size());
         }else{
             writer.writeBit(false);
@@ -101,7 +98,7 @@ public class QuadrantTreeEncoder<E> implements MatrixEncoder<E> {
         return controller;
     }
 
-    private boolean encodeHelper(StackFrame frame){
+    private boolean encodeHelper(Quadrant frame){
         int yPos = frame.yPos, xPos = frame.xPos;
         if(yPos>=matrix.length){
             return false;
@@ -124,14 +121,14 @@ public class QuadrantTreeEncoder<E> implements MatrixEncoder<E> {
             return true;
         }else{
             boolean foundData = false;
-            for(StackFrame child : frame.getChildren()){
+            for(Quadrant child : frame.getChildren()){
                 foundData|=doPathSetup(child);
             }
             return foundData;
         }
     }
 
-    private boolean doPathSetup(StackFrame frame){
+    private boolean doPathSetup(Quadrant frame){
         if(remainingItems==0){
             writer.writeBit(false);
             return false;
@@ -161,7 +158,7 @@ public class QuadrantTreeEncoder<E> implements MatrixEncoder<E> {
         int height = input.readBits(heightBits,intDecoder);
         int widthBits = input.readBits(5,intDecoder)+1;
         int width = input.readBits(widthBits,intDecoder);
-        StackFrame current = new StackFrame(0,0,height,width);
+        Quadrant current = new Quadrant(0,0,height,width);
         V[][] matrix = (V[][])new Object[height][width];
         while(current!=null&&input.hasNext()){
             boolean nextInst = input.readBit();
