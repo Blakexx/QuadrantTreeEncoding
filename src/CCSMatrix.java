@@ -2,7 +2,7 @@ import java.io.File;
 import java.util.Iterator;
 import java.util.function.BiFunction;
 
-public class CRSMatrix<E> extends Matrix<E> {
+public class CCSMatrix<E> extends Matrix<E> {
 
     private final MemoryController encodedMatrix;
     public final BiFunction<E,Integer,byte[]> bitEncoder;
@@ -10,7 +10,7 @@ public class CRSMatrix<E> extends Matrix<E> {
     private final BiFunction<Integer,Integer,byte[]> intEncoder;
     private final BiFunction<byte[],Integer,Integer> intDecoder;
 
-    public CRSMatrix(MemoryController encodedMatrix, BiFunction<E,Integer,byte[]> bitEncoder, BiFunction<byte[],Integer,E> bitDecoder){
+    public CCSMatrix(MemoryController encodedMatrix, BiFunction<E,Integer,byte[]> bitEncoder, BiFunction<byte[],Integer,E> bitDecoder){
         this.encodedMatrix = encodedMatrix;
         this.bitEncoder = bitEncoder;
         this.bitDecoder = bitDecoder;
@@ -19,8 +19,8 @@ public class CRSMatrix<E> extends Matrix<E> {
         trim();
     }
 
-    public CRSMatrix(E[][] matrix, int bitsPerData, BiFunction<E,Integer,byte[]> bitEncoder, BiFunction<byte[],Integer,E> bitDecoder){
-        this(new CRSEncoder<>(
+    public CCSMatrix(E[][] matrix, int bitsPerData, BiFunction<E,Integer,byte[]> bitEncoder, BiFunction<byte[],Integer,E> bitDecoder){
+        this(new CCSEncoder<>(
                 matrix,
                 bitsPerData,
                 bitEncoder,
@@ -28,8 +28,8 @@ public class CRSMatrix<E> extends Matrix<E> {
         ).encodeMatrix(new MemoryController()),bitEncoder,bitDecoder);
     }
 
-    public CRSMatrix(E[][] matrix, int bitsPerData, BiFunction<E,Integer,byte[]> bitEncoder, BiFunction<byte[],Integer,E> bitDecoder, File source){
-        this(new CRSEncoder<>(
+    public CCSMatrix(E[][] matrix, int bitsPerData, BiFunction<E,Integer,byte[]> bitEncoder, BiFunction<byte[],Integer,E> bitDecoder, File source){
+        this(new CCSEncoder<>(
                 matrix,
                 bitsPerData,
                 bitEncoder,
@@ -45,21 +45,21 @@ public class CRSMatrix<E> extends Matrix<E> {
         encodedMatrix.trim();
     }
 
-    private int getOffset(int row){
+    private int getOffset(int col){
         int bitsPerSize = Main.logBaseCeil(height()*width()+1,2);
-        return encodedMatrix.getBits(headerSize()+bitsPerSize*(row),bitsPerSize,intDecoder);
+        return encodedMatrix.getBits(headerSize()+bitsPerSize*(col),bitsPerSize,intDecoder);
     }
 
     public E get(int r, int c) {
         int bitsPerSize = Main.logBaseCeil(height()*width()+1,2);
-        int start = getOffset(r);
-        int toCheck = r==height()-1?width():getOffset(r+1)-start;
+        int start = getOffset(c);
+        int toCheck = c==width()-1?height():getOffset(c+1)-start;
         int hasChecked = 0;
-        int currentBit = headerSize()+bitsPerSize*height() + start*(bitsPerWidth()+bitsPerData());
+        int currentBit = headerSize()+bitsPerSize*width() + start*(bitsPerHeight()+bitsPerData());
         while(currentBit<encodedMatrix.size()&&hasChecked<toCheck){
-            int col = encodedMatrix.getBits(currentBit,bitsPerWidth(),intDecoder);
+            int row = encodedMatrix.getBits(currentBit,bitsPerHeight(),intDecoder);
             currentBit+=bitsPerWidth();
-            if(col==c){
+            if(row==r){
                 return encodedMatrix.getBits(currentBit,bitsPerData(),bitDecoder);
             }
             currentBit+=bitsPerData();
@@ -105,7 +105,7 @@ public class CRSMatrix<E> extends Matrix<E> {
     }
 
     public E[][] toRawMatrix(){
-        return CRSEncoder.decodeMatrix(encodedMatrix,bitDecoder);
+        return CCSEncoder.decodeMatrix(encodedMatrix,bitDecoder);
     }
 
     public E[] getRow(int r, Class<E> type) {
@@ -119,34 +119,34 @@ public class CRSMatrix<E> extends Matrix<E> {
     public Iterator<DataPoint<E>> iterator(int r, int c, int h, int w, IteratorType type){
         Quadrant toIterate = new Quadrant(r,c,h,w);
         if(type==IteratorType.DEFAULT){
-            return new RowIterator<>(this, toIterate);
+            return new ColumnIterator<>(this, toIterate);
         }
         return new GenericIterator<>(this, toIterate,type);
     }
 
-    private static class RowIterator<V> implements Iterator<DataPoint<V>>{
+    private static class ColumnIterator<V> implements Iterator<DataPoint<V>>{
 
-        private final CRSMatrix<V> matrix;
-        private int readCount, currentR, currentC, currentBit, rEndBit;
+        private final CCSMatrix<V> matrix;
+        private int readCount, currentR, currentC, currentBit, cEndBit;
         private final int bitsPerSize;
         private final Quadrant readFrame;
 
-        private RowIterator(CRSMatrix<V> matrix, Quadrant readFrame){
+        private ColumnIterator(CCSMatrix<V> matrix, Quadrant readFrame){
             this.matrix = matrix;
             this.readFrame = readFrame;
             bitsPerSize = Main.logBaseCeil(matrix.size()+1,2);
-            currentR = readFrame.yPos;
-            setUpRow(currentR);
+            currentC = readFrame.xPos;
+            setUpCol(currentR);
         }
 
-        private void setUpRow(int row){
-            int rStart = matrix.getOffset(row);
-            if(row==matrix.height()-1){
-                rEndBit = matrix.encodedMatrix.size();
+        private void setUpCol(int col){
+            int rStart = matrix.getOffset(col);
+            if(col==matrix.width()-1){
+                cEndBit = matrix.encodedMatrix.size();
             }else{
-                rEndBit = matrix.headerSize()+bitsPerSize*matrix.height() + matrix.getOffset(row+1)*(matrix.bitsPerWidth()+matrix.bitsPerData());
+                cEndBit = matrix.headerSize()+bitsPerSize*matrix.width() + matrix.getOffset(col+1)*(matrix.bitsPerHeight()+matrix.bitsPerData());
             }
-            currentBit = matrix.headerSize()+bitsPerSize*matrix.height() + rStart*(matrix.bitsPerWidth()+matrix.bitsPerData());
+            currentBit = matrix.headerSize()+bitsPerSize*matrix.width() + rStart*(matrix.bitsPerHeight()+matrix.bitsPerData());
         }
 
         public boolean hasNext(){
@@ -155,33 +155,33 @@ public class CRSMatrix<E> extends Matrix<E> {
 
         public DataPoint<V> next(){
             MemoryController encodedMatrix = matrix.encodedMatrix;
-            if(currentC>=readFrame.xPos+readFrame.width){
-                currentC = 0;
-                currentR++;
-                setUpRow(currentR);
+            if(currentR >= readFrame.yPos+readFrame.height){
+                currentR = 0;
+                currentC++;
+                setUpCol(currentC);
             }
             V data = matrix.defaultItem();
-            if(currentBit>=rEndBit){
+            if(currentBit >= cEndBit){
                 readCount++;
-                return new DataPoint<>(data,currentR,currentC++);
+                return new DataPoint<>(data,currentR++,currentC);
             }
-            int bitsPerWidth = matrix.bitsPerWidth();
+            int bitsPerHeight = matrix.bitsPerHeight();
             int bitsPerData = matrix.bitsPerData();
-            int actualC = encodedMatrix.getBits(currentBit,bitsPerWidth,matrix.intDecoder);
-            while(currentC<readFrame.xPos){
-                if(actualC<readFrame.xPos&&currentBit+(bitsPerData+bitsPerWidth)<rEndBit){
-                    currentBit+=(bitsPerWidth+bitsPerData);
-                    actualC = encodedMatrix.getBits(currentBit,bitsPerWidth,matrix.intDecoder);
+            int actualR = encodedMatrix.getBits(currentBit,bitsPerHeight,matrix.intDecoder);
+            while(currentR < readFrame.yPos){
+                if(actualR<readFrame.yPos && currentBit+(bitsPerData+bitsPerHeight) < cEndBit){
+                    currentBit+=(bitsPerHeight+bitsPerData);
+                    actualR = encodedMatrix.getBits(currentBit,bitsPerHeight,matrix.intDecoder);
                 }
-                currentC++;
+                currentR++;
             }
             readCount++;
-            if(actualC==currentC){
-                currentBit+=bitsPerWidth;
+            if(actualR == currentR){
+                currentBit += bitsPerHeight;
                 data = encodedMatrix.getBits(currentBit,bitsPerData,matrix.bitDecoder);
-                currentBit+=bitsPerData;
+                currentBit += bitsPerData;
             }
-            return new DataPoint<>(data,currentR,currentC++);
+            return new DataPoint<>(data,currentR++,currentC);
         }
     }
 }

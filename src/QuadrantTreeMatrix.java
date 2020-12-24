@@ -3,7 +3,7 @@ import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.BiFunction;
 
-public class CachedTreeMatrix<E> implements Matrix<E>{
+public class QuadrantTreeMatrix<E> extends Matrix<E>{
     private final MemoryController encodedMatrix;
     private final CacheManager<Integer,Integer> cache;
     public final BiFunction<E,Integer,byte[]> bitEncoder;
@@ -13,7 +13,7 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
     private final BiFunction<byte[],Integer,Integer> intDecoder;
     public final double cachePercent;
 
-    public CachedTreeMatrix(MemoryController encodedMatrix, BiFunction<E,Integer,byte[]> bitEncoder, BiFunction<byte[],Integer,E> bitDecoder, double cachePercent){
+    public QuadrantTreeMatrix(MemoryController encodedMatrix, BiFunction<E,Integer,byte[]> bitEncoder, BiFunction<byte[],Integer,E> bitDecoder, double cachePercent){
         this.cachePercent = cachePercent;
         this.encodedMatrix = encodedMatrix;
         this.bitEncoder = bitEncoder;
@@ -42,7 +42,7 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
         cacheQueue();
     }
 
-    public CachedTreeMatrix(E[][] matrix, int bitsPerData, BiFunction<E,Integer,byte[]> bitEncoder, BiFunction<byte[],Integer,E> bitDecoder, double cachePercent){
+    public QuadrantTreeMatrix(E[][] matrix, int bitsPerData, BiFunction<E,Integer,byte[]> bitEncoder, BiFunction<byte[],Integer,E> bitDecoder, double cachePercent){
         this(new QuadrantTreeEncoder<>(
                 matrix,
                 bitsPerData,
@@ -51,7 +51,7 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
         ).encodeMatrix(new MemoryController()),bitEncoder,bitDecoder,cachePercent);
     }
 
-    public CachedTreeMatrix(E[][] matrix, int bitsPerData, BiFunction<E,Integer,byte[]> bitEncoder, BiFunction<byte[],Integer,E> bitDecoder, double cachePercent, File source){
+    public QuadrantTreeMatrix(E[][] matrix, int bitsPerData, BiFunction<E,Integer,byte[]> bitEncoder, BiFunction<byte[],Integer,E> bitDecoder, double cachePercent, File source){
         this(new QuadrantTreeEncoder<>(
                 matrix,
                 bitsPerData,
@@ -347,16 +347,6 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
         return QuadrantTreeEncoder.decodeMatrix(encodedMatrix,bitDecoder);
     }
 
-    public String toString(){
-        Object[][] mat;
-        try{
-            mat = toRawMatrix();
-        }catch(Exception e){
-            return e.toString();
-        }
-        return Main.matrixToString(mat);
-    }
-
     private int nextRow = 0;
     private Pair<Quadrant,Integer> nextRowInfo;
 
@@ -440,12 +430,12 @@ public class CachedTreeMatrix<E> implements Matrix<E>{
 
     private static class TreeIterator<V> implements Iterator<DataPoint<V>>{
 
-        private final CachedTreeMatrix<V> matrix;
+        private final QuadrantTreeMatrix<V> matrix;
         private int index, readCount, defaultsRead;
         private Quadrant current;
         private final Quadrant readFrame;
 
-        private TreeIterator(CachedTreeMatrix<V> matrix, Quadrant readFrame){
+        private TreeIterator(QuadrantTreeMatrix<V> matrix, Quadrant readFrame){
             if(matrix==null||readFrame==null||!new Quadrant(0,0, matrix.height(), matrix.width()).contains(readFrame)){
                 throw new IllegalArgumentException("Illegal Arguments");
             }

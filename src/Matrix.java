@@ -1,28 +1,41 @@
-import java.io.IOException;
 import java.util.Iterator;
 
-public interface Matrix<E>{
+public abstract class Matrix<E>{
 
-    int estimateBitSize();
-    void trim();
+    public abstract int estimateBitSize();
+    public abstract void trim();
 
-    E get(int r, int c);
-    E set(int r, int c, E value);
+    public abstract E get(int r, int c);
+    public abstract E set(int r, int c, E value);
 
-    int height();
-    int width();
-    int size();
+    public abstract int height();
+    public abstract int width();
+    public abstract int size();
 
-    E[][] toRawMatrix();
+    public abstract E[][] toRawMatrix();
 
-    E[] getRow(int r, Class<E> type);
-    E[][] bulkGet(int r, int c, int height, int width, Class<E> type);
+    public abstract E[] getRow(int r, Class<E> type);
+    public abstract E[][] bulkGet(int r, int c, int height, int width, Class<E> type);
 
-    Iterator<DataPoint<E>> iterator();
+    public Iterator<DataPoint<E>> iterator(){
+        return iterator(IteratorType.DEFAULT);
+    }
 
-    Iterator<DataPoint<E>> iterator(IteratorType type);
+    public Iterator<DataPoint<E>> iterator(IteratorType type){
+        return iterator(0,0,height(),width(),type);
+    }
 
-    Iterator<DataPoint<E>> iterator(int r, int c, int h, int w, IteratorType type);
+    public abstract Iterator<DataPoint<E>> iterator(int r, int c, int h, int w, IteratorType type);
+
+    public String toString(){
+        Object[][] mat;
+        try{
+            mat = toRawMatrix();
+        }catch(Exception e){
+            return e.toString();
+        }
+        return Main.matrixToString(mat);
+    }
 
 
 }

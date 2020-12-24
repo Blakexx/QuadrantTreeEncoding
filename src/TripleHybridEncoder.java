@@ -114,6 +114,10 @@ public class TripleHybridEncoder<E> implements MatrixEncoder<E> {
         return controller;
     }
 
+    public Matrix<E> getMatrix(MemoryController controller, double cachePercent) {
+        return null;
+    }
+
     private LinkedList<DataPoint<E>> encodeHelper(Quadrant frame){
         int yPos = frame.yPos, xPos = frame.xPos;
         LinkedList<DataPoint<E>> foundData = new LinkedList<>();

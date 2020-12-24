@@ -1,7 +1,6 @@
 import java.io.*;
-import java.util.function.BiFunction;
 
-public class FileBitOutputStream implements BitWriter {
+public class FileBitOutputStream extends BitOutputStream {
 
     private FileOutputStream output;
     private byte outputBuffer, outCount = 0;
@@ -15,7 +14,7 @@ public class FileBitOutputStream implements BitWriter {
         this(new File(path),append);
     }
 
-    public void writeBits(int length, byte[] bits) throws IOException{
+    public void writeBits(int length, byte[] bits){
         if(length>bits.length*8){
             throw new IllegalArgumentException("Invalid length");
         }
@@ -31,11 +30,7 @@ public class FileBitOutputStream implements BitWriter {
         }
     }
 
-    public <E> void writeBits(int length, E data, BiFunction<E, Integer, byte[]> encoder) throws IOException{
-        writeBits(length, encoder.apply(data,length));
-    }
-
-    public void writeBit(boolean bit) throws IOException{
+    public void writeBit(boolean bit){
         int toWrite = bit?1:0;
         if(outCount==8){
             flush();
@@ -43,16 +38,24 @@ public class FileBitOutputStream implements BitWriter {
         outputBuffer+=(toWrite<<(7-outCount++));
     }
 
-    public void flush() throws IOException{
+    public void flush(){
         if(outCount!=0){
-            output.write(outputBuffer);
+            try{
+                output.write(outputBuffer);
+            }catch(IOException e){
+                throw new RuntimeException("Flush failed");
+            }
             outCount = 0;
             outputBuffer = 0;
         }
     }
 
-    public void close() throws IOException{
-        flush();
-        output.close();
+    public void close(){
+        try{
+            flush();
+            output.close();
+        }catch(IOException e){
+            throw new RuntimeException("Close failed");
+        }
     }
 }

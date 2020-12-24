@@ -1,4 +1,3 @@
-import java.io.IOException;
 import java.util.function.BiFunction;
 
 public interface MatrixEncoder<E>{
@@ -22,6 +21,8 @@ public interface MatrixEncoder<E>{
     }
 
     MemoryController encodeMatrix(MemoryController controller);
+
+    Matrix<E> getMatrix(MemoryController controller, double cachePercent);
 
     E[][] decodeMatrix(MemoryController controller);
 

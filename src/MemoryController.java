@@ -1,4 +1,5 @@
 import java.io.File;
+import java.io.OutputStream;
 import java.util.function.BiFunction;
 
 public class MemoryController{
@@ -139,7 +140,7 @@ public class MemoryController{
         return new MemoryBitOutputStream(this);
     }
 
-    public static class MemoryBitOutputStream implements BitWriter{
+    public static class MemoryBitOutputStream extends BitOutputStream {
 
         private final MemoryController controller;
         private boolean closed = false;
@@ -159,10 +160,6 @@ public class MemoryController{
             controller.setBits(controller.size(),length,bits);
         }
 
-        public <E> void writeBits(int length, E data, BiFunction<E, Integer, byte[]> encoder){
-            writeBits(length,encoder.apply(data,length));
-        }
-
         public void writeBit(boolean bit){
             checkOpen();
             controller.setBit(controller.size(),bit);
@@ -171,13 +168,15 @@ public class MemoryController{
         public void close(){
             closed = true;
         }
+
+        public void flush(){}
     }
 
     public MemoryBitInputStream inputStream(){
         return new MemoryBitInputStream(this);
     }
 
-    public static class MemoryBitInputStream implements BitReader{
+    public static class MemoryBitInputStream extends BitInputStream {
 
         private int readIndex;
         private final MemoryController controller;
@@ -215,6 +214,7 @@ public class MemoryController{
         }
 
         public byte[] readBits(int num){
+            checkOpen();
             byte[] data = controller.getBits(readIndex,num);
             readIndex+=num;
             return data;

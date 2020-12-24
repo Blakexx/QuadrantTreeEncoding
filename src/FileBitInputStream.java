@@ -1,7 +1,7 @@
 import java.io.*;
 import java.util.function.BiFunction;
 
-public class FileBitInputStream implements BitReader{
+public class FileBitInputStream extends BitInputStream{
 
     private FileInputStream input;
     private byte inputBuffer, inCount = 8;
@@ -30,7 +30,7 @@ public class FileBitInputStream implements BitReader{
         return totalRead;
     }
 
-    public byte[] readBits(int num) throws IOException{
+    public byte[] readBits(int num){
         byte[] bytes = new byte[(int)Math.ceil(num/8.0)];
         for(int i = 0; i<num;i++){
             if(readBit()){
@@ -41,28 +41,33 @@ public class FileBitInputStream implements BitReader{
         return bytes;
     }
 
-    public <E> E readBits(int num, BiFunction<byte[], Integer, E> decoder) throws IOException{
-        return decoder.apply(readBits(num),num);
-    }
-
-    public boolean readBit() throws IOException{
+    public boolean readBit(){
         prepareReadBuffer();
         totalRead++;
         return (inputBuffer&(1<<7-inCount++))!=0;
     }
 
-    private void prepareReadBuffer() throws IOException{
+    private void prepareReadBuffer(){
         if(inCount==8){
             inCount = 0;
-            int newData = input.read();
+            int newData = -1;
+            try{
+                newData = input.read();
+            }catch(IOException e){
+                throw new RuntimeException("Read failed");
+            }
             if(newData==-1){
-                throw new IOException("End of file");
+                throw new RuntimeException("End of file");
             }
             inputBuffer = (byte)newData;
         }
     }
 
-    public void close() throws IOException{
-        input.close();
+    public void close(){
+        try{
+            input.close();
+        }catch(IOException e){
+            throw new RuntimeException("Close failed");
+        }
     }
 }

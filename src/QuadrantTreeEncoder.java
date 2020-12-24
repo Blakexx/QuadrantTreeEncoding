@@ -98,6 +98,15 @@ public class QuadrantTreeEncoder<E> implements MatrixEncoder<E> {
         return controller;
     }
 
+    public Matrix<E> getMatrix(MemoryController controller, double cachePercent) {
+        return new QuadrantTreeMatrix<>(
+                controller,
+                encoder,
+                decoder,
+                cachePercent
+        );
+    }
+
     private boolean encodeHelper(Quadrant frame){
         int yPos = frame.yPos, xPos = frame.xPos;
         if(yPos>=matrix.length){

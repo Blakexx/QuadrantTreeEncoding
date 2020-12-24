@@ -7,10 +7,16 @@ import java.lang.reflect.Array;
 import java.util.function.*;
 import java.util.stream.*;
 
-class Main {
+public class Main {
 
     private static final double byteFactor = Math.pow(10,3); //Kilobytes
     private static final double timeFactor = Math.pow(10,6); //Milliseconds
+    private static final String[] schemes = {"QTE","CRS","CCS","DEF","ZIP"};
+    private static final boolean[] needsCache = {true,false,false,false,false};
+
+    private static double bitsToFormat(long bits){
+        return roundUpDiv(bits,8)/byteFactor;
+    }
 
     public static void main(String[] args){
         Scanner in = new Scanner(System.in);
@@ -23,19 +29,22 @@ class Main {
             System.out.println("2: QTE/Dense Hybrid");
             System.out.println("3: QTE/Dense/CRS Hybrid");
             System.out.println("4: CRS");
-            type = readInt("Encoding Type",in,(i)->i>=1&&i<=4);
+            System.out.println("5: CCS");
+            System.out.println("6: ZIP");
+            type = readInt("Encoding Type",in,(i)->i>=1&&i<=6);
             System.out.println();
             diskSizeTester(getEncoder(type));
         }else if(type==2){
-            System.out.println("1. QTE Matrix");
-            System.out.println("2. CRS Matrix");
-            type = readInt("Encoding Type",in,(i)->i>=1&&i<=2);
+            for(int i = 1; i<=schemes.length; i++){
+                System.out.println(i+". "+schemes[i-1]+" Matrix");
+            }
+            type = readInt("Encoding Type",in,(i)->i>=1&&i<=schemes.length);
             System.out.println();
             System.out.println("1. Memory");
             System.out.println("2. Disk");
             int loc = readInt("Data Location",in,(i)->i>=1&&i<=2);
             System.out.println();
-            double cachePercent = type==1?readDouble("Cache %",in,(i)->i>=0&&i<=1):0;
+            double cachePercent = needsCache[type-1]?readDouble("Cache %",in,(i)->i>=0&&i<=1):0;
             System.out.println();
             readWriteTester(cachePercent, type, loc==2);
         }
@@ -69,6 +78,18 @@ class Main {
                     enc,
                     dec
             );
+            case 5 -> new CCSEncoder<>(
+                    null,
+                    8,
+                    enc,
+                    dec
+            );
+            case 6 -> new ZipEncoder<>(new DirectEncoder<>(
+                    null,
+                    8,
+                    enc,
+                    dec
+            ));
             default -> throw new IllegalArgumentException("Invalid Type");
         };
     }
@@ -80,34 +101,25 @@ class Main {
     }
 
     private static Matrix<Byte> getByteMatrix(double fullness, double cachePercent, int r, int c, int type, boolean onDisk){
-        if(type<1 || type>2){
+        if(type<1 || type>schemes.length){
             throw new IllegalArgumentException("Invalid Type");
         }
-        String fileName = type==1?"qte.matrix":"crs.matrix";
-        MemoryController controller = onDisk?new MemoryController(new File(fileName)):new MemoryController();
+        MemoryController controller = onDisk?new MemoryController(new File("matrices/matrix."+schemes[type-1].toLowerCase())):new MemoryController();
         Byte[][] matrix = generateMatrix(r,c,fullness);
         BiFunction<Byte, Integer, byte[]> encoder = (b,bpd)->new byte[]{b};
         BiFunction<byte[], Integer, Byte> decoder = (b,bpd)->b[0];
         MatrixEncoder<Byte> matrixEncoder = switch(type){
             case 1 -> new QuadrantTreeEncoder<>(matrix,8,encoder,decoder);
             case 2 -> new CRSEncoder<>(matrix,8,encoder,decoder);
+            case 3 -> new CCSEncoder<>(matrix,8,encoder,decoder);
+            case 4 -> new DirectEncoder<>(matrix,8,encoder,decoder);
+            case 5 -> new ZipEncoder<>(new DirectEncoder<>(
+                    matrix,8,encoder,decoder
+            ));
             default -> null;
         };
         matrixEncoder.encodeMatrix(controller);
-        return switch(type){
-            case 1 -> new CachedTreeMatrix<>(
-                    controller,
-                    encoder,
-                    decoder,
-                    cachePercent
-            );
-            case 2 -> new CRSMatrix<>(
-                    controller,
-                    encoder,
-                    decoder
-            );
-            default -> null;
-        };
+        return matrixEncoder.getMatrix(controller,cachePercent);
     }
 
     private static void runTests(List<Consumer<Matrix<Byte>>> toRun, int dim, double fullness, double cachePercent, int type, boolean onDisk, StringBuilder data){
@@ -122,10 +134,8 @@ class Main {
             }
         }
         avgBits/=runsPerTest;
-        avgBits = roundUpDiv(avgBits,8);
-        double formatBits = avgBits/byteFactor;
         StringBuilder tempString = new StringBuilder();
-        tempString.append(dim*dim).append(" ").append(String.format("%.2f", fullness)).append(" ").append(String.format("%.2f", cachePercent)).append(" ").append(String.format("%.2f",formatBits));
+        tempString.append(dim*dim).append(" ").append(String.format("%.2f", fullness)).append(" ").append(String.format("%.2f", cachePercent)).append(" ").append(String.format("%.2f",bitsToFormat(avgBits)));
         for(int i = 0; i<timeData.length;i++){
             timeData[i]/=runsPerTest;
             timeData[i]/=timeFactor;
@@ -145,13 +155,13 @@ class Main {
                 Main::randomTest
         );
         StringBuilder data = new StringBuilder();
-        String header = "Elements Fullness Cache_Size Total_Bits SeqRow RanRow SeqCol RanCol Random";
+        String header = "Elements Fullness Cache_Size Total_Size SeqRow RanRow SeqCol RanCol Random";
         System.out.println("Size Test:");
         data.append("Size Test:\n");
         data.append(header);
         data.append("\n");
         System.out.println(header);
-        for(int dim = 16; dim<=1024;dim*=2){
+        for(int dim = 16; dim <= 1024;dim *= 2){
             runTests(toRun,dim,.3,cachePercent,type,onDisk,data);
         }
         System.out.println("\nFullness Test:");
@@ -250,7 +260,7 @@ class Main {
 
     public static void diskSizeTester(MatrixEncoder<Byte> encoder){
         String formatName = encoder.getName();
-        StringBuilder data = new StringBuilder("Rows Columns Fullness "+formatName+"_Bits Data_Bits Total_Bits");
+        StringBuilder data = new StringBuilder("Rows Columns Fullness "+formatName+"_Size Data_Size Total_Size");
         System.out.println(data);
         data.append("\n");
         for(int d = 10; d<=1000;d*=10){
@@ -288,9 +298,7 @@ class Main {
                 }
                 avgBits/=runsPerSize;
                 averageTotal/=runsPerSize;
-                avgBits = roundUpDiv(avgBits,8);
-                double formatBits = avgBits/byteFactor;
-                String str = d+" "+d+" "+String.format("%.2f",sparse)+" "+String.format("%.2f",formatBits)+" "+averageTotal;
+                String str = d+" "+d+" "+String.format("%.2f",sparse)+" "+String.format("%.2f",bitsToFormat(avgBits))+" "+String.format("%.2f",bitsToFormat(averageTotal));
                 System.out.println(str);
                 str+="\n";
                 data.append(str);

@@ -1,18 +1,22 @@
 import java.util.HashMap;
 import java.util.function.BiFunction;
 
-public class CRSEncoder<E> implements MatrixEncoder<E> {
+public class DirectEncoder<E> implements MatrixEncoder<E> {
 
     private E[][] matrix;
     private int bitsPerData, refSize, dataSize, headerSize;
     private BiFunction<E,Integer,byte[]> encoder;
     private BiFunction<byte[],Integer,E> decoder;
 
-    public CRSEncoder(E[][] matrix, int bitsPerData, BiFunction<E,Integer,byte[]> e, BiFunction<byte[],Integer,E> d){
+    public DirectEncoder(E[][] matrix, int bitsPerData, BiFunction<E,Integer,byte[]> e, BiFunction<byte[],Integer,E> d){
         this.matrix = matrix;
         this.bitsPerData = bitsPerData;
         this.encoder = e;
         this.decoder = d;
+    }
+
+    public String getName() {
+        return "Direct";
     }
 
     public int refSize() {
@@ -42,15 +46,12 @@ public class CRSEncoder<E> implements MatrixEncoder<E> {
     public MemoryController encodeMatrix(MemoryController controller) {
         controller.clear();
         MemoryController.MemoryBitOutputStream writer = controller.outputStream();
-        refSize = 0;
-        dataSize = 0;
-        headerSize = 0;
-        int longestX = 0;
+        int height = matrix.length, width = 0;
         HashMap<E,Integer> countMap = new HashMap<>();
         int maxCount = 0, itemCount = 0;
         E defaultItem = null;
         for(int r = 0; r<matrix.length;r++){
-            longestX = Math.max(longestX,matrix[r].length);
+            width = Math.max(width,matrix[r].length);
             itemCount+=matrix[r].length;
             for(int c = 0; c<matrix[r].length;c++){
                 E item = matrix[r][c];
@@ -65,41 +66,37 @@ public class CRSEncoder<E> implements MatrixEncoder<E> {
                 countMap.put(matrix[r][c], val);
             }
         }
-        dataSize = (itemCount-maxCount)*bitsPerData;
+        dataSize = bitsPerData * height * width;
         BiFunction<Integer,Integer,byte[]> intEncoder = BitEncoders.intEncoder;
         writer.writeBits(8,bitsPerData,intEncoder);
         writer.writeBits(bitsPerData,defaultItem,encoder);
-        int height = matrix.length, width = longestX;
         int heightBits = Main.logBaseCeil(height+1,2);
         int widthBits = Main.logBaseCeil(width+1,2);
         writer.writeBits(5,heightBits-1,intEncoder);
         writer.writeBits(heightBits,height,intEncoder);
         writer.writeBits(5,widthBits-1,intEncoder);
         writer.writeBits(widthBits,width,intEncoder);
-        headerSize=8+bitsPerData+5+heightBits+5+widthBits;
-        MemoryController dataController = new MemoryController();
-        int sizeBits = Main.logBaseCeil(height*width+1,2);
-        MemoryController.MemoryBitOutputStream dataWriter = dataController.outputStream();
-        int totalWritten = 0;
-        for(int r = 0; r<height;r++){
-            writer.writeBits(sizeBits,totalWritten,intEncoder);
-            for(int c = 0; c<matrix[r].length;c++){
-                E item = matrix[r][c];
-                if(item!=defaultItem){
-                    dataWriter.writeBits(widthBits,c,intEncoder);
-                    dataWriter.writeBits(bitsPerData,item,encoder);
-                    totalWritten++;
-                }
+        headerSize = 8+bitsPerData+5+heightBits+5+widthBits;
+        for(int r = 0; r<matrix.length;r++){
+            for(int c = 0; c<width;c++){
+                E item = c >= matrix[r].length ? defaultItem : matrix[r][c];
+                writer.writeBits(bitsPerData,item,encoder);
             }
         }
-        writer.writeBits(dataController.size(),dataController.getBits(0,dataController.size()));
-        refSize = controller.size()-dataSize-headerSize;
         controller.trim();
         return controller;
     }
 
     public Matrix<E> getMatrix(MemoryController controller, double cachePercent) {
-        return new CRSMatrix<>(
+        return new DirectMatrix<>(
+                controller,
+                encoder,
+                decoder
+        );
+    }
+
+    public Matrix<E> getMatrix(MemoryController controller) {
+        return new DirectMatrix<>(
                 controller,
                 encoder,
                 decoder
@@ -110,44 +107,22 @@ public class CRSEncoder<E> implements MatrixEncoder<E> {
         return decodeMatrix(controller,decoder);
     }
 
-    public static <V> V[][] decodeMatrix(MemoryController controller, BiFunction<byte[],Integer,V> decoder){
+    public static <V> V[][] decodeMatrix(MemoryController controller, BiFunction<byte[],Integer,V> decoder) {
         MemoryController.MemoryBitInputStream input = controller.inputStream();
         BiFunction<byte[],Integer,Integer> intDecoder = BitEncoders.intDecoder;
         int bitsPerData = input.readBits(8,intDecoder);
-        V defaultItem = input.readBits(bitsPerData,decoder);
+        input.readBits(bitsPerData);
         int heightBits = input.readBits(5,intDecoder)+1;
         int height = input.readBits(heightBits,intDecoder);
         int widthBits = input.readBits(5,intDecoder)+1;
         int width = input.readBits(widthBits,intDecoder);
-        int sizeBits = Integer.toString(height*width,2).length();
         V[][] matrix = (V[][])new Object[height][width];
-        int[] offsetRay = new int[height];
         for(int r = 0; r<height; r++){
-            offsetRay[r] = input.readBits(sizeBits,intDecoder);
-        }
-        for(int r = 0; r<height; r++){
-            int toRead = r==height-1?width:offsetRay[r+1]-offsetRay[r];
-            int hasRead = 0;
-            int lastCol = -1;
-            while(input.hasNext()&&hasRead<toRead){
-                int col = input.readBits(widthBits,intDecoder);
-                V item = input.readBits(bitsPerData,decoder);
-                for(int c = lastCol+1; c<col;c++){
-                    matrix[r][c] = defaultItem;
-                }
-                matrix[r][col] = item;
-                hasRead++;
-                lastCol = col;
-            }
-            for(int c = lastCol+1; c<width; c++){
-                matrix[r][c] = defaultItem;
+            for(int c = 0; c<width; c++){
+                matrix[r][c] = input.readBits(bitsPerData,decoder);
             }
         }
         return matrix;
-    }
-
-    public String getName() {
-        return "CRS";
     }
 
 }

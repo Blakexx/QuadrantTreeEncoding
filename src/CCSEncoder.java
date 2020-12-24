@@ -1,14 +1,14 @@
 import java.util.HashMap;
 import java.util.function.BiFunction;
 
-public class CRSEncoder<E> implements MatrixEncoder<E> {
+public class CCSEncoder<E> implements MatrixEncoder<E> {
 
     private E[][] matrix;
     private int bitsPerData, refSize, dataSize, headerSize;
     private BiFunction<E,Integer,byte[]> encoder;
     private BiFunction<byte[],Integer,E> decoder;
 
-    public CRSEncoder(E[][] matrix, int bitsPerData, BiFunction<E,Integer,byte[]> e, BiFunction<byte[],Integer,E> d){
+    public CCSEncoder(E[][] matrix, int bitsPerData, BiFunction<E,Integer,byte[]> e, BiFunction<byte[],Integer,E> d){
         this.matrix = matrix;
         this.bitsPerData = bitsPerData;
         this.encoder = e;
@@ -76,17 +76,20 @@ public class CRSEncoder<E> implements MatrixEncoder<E> {
         writer.writeBits(heightBits,height,intEncoder);
         writer.writeBits(5,widthBits-1,intEncoder);
         writer.writeBits(widthBits,width,intEncoder);
-        headerSize=8+bitsPerData+5+heightBits+5+widthBits;
+        headerSize = 8+bitsPerData+5+heightBits+5+widthBits;
         MemoryController dataController = new MemoryController();
         int sizeBits = Main.logBaseCeil(height*width+1,2);
         MemoryController.MemoryBitOutputStream dataWriter = dataController.outputStream();
         int totalWritten = 0;
-        for(int r = 0; r<height;r++){
+        for(int c = 0; c<width;c++){
             writer.writeBits(sizeBits,totalWritten,intEncoder);
-            for(int c = 0; c<matrix[r].length;c++){
+            for(int r = 0; r<height;r++){
+                if(c >= matrix[r].length){
+                    continue;
+                }
                 E item = matrix[r][c];
                 if(item!=defaultItem){
-                    dataWriter.writeBits(widthBits,c,intEncoder);
+                    dataWriter.writeBits(heightBits,r,intEncoder);
                     dataWriter.writeBits(bitsPerData,item,encoder);
                     totalWritten++;
                 }
@@ -99,7 +102,7 @@ public class CRSEncoder<E> implements MatrixEncoder<E> {
     }
 
     public Matrix<E> getMatrix(MemoryController controller, double cachePercent) {
-        return new CRSMatrix<>(
+        return new CCSMatrix<>(
                 controller,
                 encoder,
                 decoder
@@ -122,24 +125,24 @@ public class CRSEncoder<E> implements MatrixEncoder<E> {
         int sizeBits = Integer.toString(height*width,2).length();
         V[][] matrix = (V[][])new Object[height][width];
         int[] offsetRay = new int[height];
-        for(int r = 0; r<height; r++){
-            offsetRay[r] = input.readBits(sizeBits,intDecoder);
+        for(int c = 0; c<width; c++){
+            offsetRay[c] = input.readBits(sizeBits,intDecoder);
         }
-        for(int r = 0; r<height; r++){
-            int toRead = r==height-1?width:offsetRay[r+1]-offsetRay[r];
+        for(int c = 0; c<width; c++){
+            int toRead = c==width-1?height:offsetRay[c+1]-offsetRay[c];
             int hasRead = 0;
-            int lastCol = -1;
+            int lastRow = -1;
             while(input.hasNext()&&hasRead<toRead){
-                int col = input.readBits(widthBits,intDecoder);
+                int row = input.readBits(heightBits,intDecoder);
                 V item = input.readBits(bitsPerData,decoder);
-                for(int c = lastCol+1; c<col;c++){
+                for(int r = lastRow+1; r<row;r++){
                     matrix[r][c] = defaultItem;
                 }
-                matrix[r][col] = item;
+                matrix[row][c] = item;
                 hasRead++;
-                lastCol = col;
+                lastRow = row;
             }
-            for(int c = lastCol+1; c<width; c++){
+            for(int r = lastRow+1; r<height; r++){
                 matrix[r][c] = defaultItem;
             }
         }
@@ -147,7 +150,7 @@ public class CRSEncoder<E> implements MatrixEncoder<E> {
     }
 
     public String getName() {
-        return "CRS";
+        return "CCS";
     }
 
 }
