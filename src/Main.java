@@ -127,10 +127,13 @@ public class Main {
         long avgBits = 0;
         double[] timeData = new double[toRun.size()];
         for(int i = 0; i<runsPerTest;i++){
+            long encodeTime = System.nanoTime();
             Matrix<Byte> matrix = getByteMatrix(fullness,cachePercent,dim,dim,type,onDisk);
+            encodeTime = System.nanoTime() - encodeTime;
             avgBits+=matrix.estimateBitSize();
+            encodeTime = 0;
             for(int r = 0; r<toRun.size();r++){
-                timeData[r]+=runTest(toRun.get(r),matrix);
+                timeData[r] += runTest(toRun.get(r),matrix) + encodeTime;
             }
         }
         avgBits/=runsPerTest;
@@ -173,7 +176,10 @@ public class Main {
             runTests(toRun,1024,fullness,cachePercent,type,onDisk,data);
         }
         try{
-            PrintWriter pw = new PrintWriter(new File("runtimeData.txt"));
+            File output = new File("runTimeResults/"+schemes[type-1]+".txt");
+            output.getParentFile().mkdirs();
+            output.createNewFile();
+            PrintWriter pw = new PrintWriter(output);
             pw.write(data.toString());
             pw.flush();
         }catch(Exception e){
@@ -287,7 +293,10 @@ public class Main {
                     averageTotal+=controller.size();
                 }
                 try{
-                    FileBitOutputStream stream = new FileBitOutputStream("dense/"+d+"x"+d+"-"+String.format("%.0f",sparse*100),false);
+                    File dense = new File("dense/"+d+"x"+d+"-"+String.format("%.0f",sparse*100));
+                    dense.getParentFile().mkdirs();
+                    dense.createNewFile();
+                    FileBitOutputStream stream = new FileBitOutputStream(dense,false);
                     for(int r = 0; r<matrix.length;r++){
                         for(int c = 0; c<matrix[r].length;c++){
                             stream.writeBits(8,new byte[]{matrix[r][c]});
@@ -305,7 +314,10 @@ public class Main {
             }
         }
         try{
-            PrintWriter pw = new PrintWriter(new File("diskData.txt"));
+            File output = new File("sizeResults/"+encoder.getName()+".txt");
+            output.getParentFile().mkdirs();
+            output.createNewFile();
+            PrintWriter pw = new PrintWriter(output);
             pw.write(data.toString());
             pw.flush();
         }catch(Exception e){

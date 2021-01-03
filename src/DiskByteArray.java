@@ -10,12 +10,17 @@ public class DiskByteArray implements ByteArray{
         this.source = source;
         this.size = size;
         try{
-            source.delete();
+            if(source.exists()){
+                source.delete();
+            }
+            source.getParentFile().mkdirs();
+            source.createNewFile();
             file = new RandomAccessFile(source,"rw");
             FileOutputStream stream = new FileOutputStream(source);
             stream.write(new byte[size]);
             stream.close();
         }catch(Exception e){
+            e.printStackTrace();
             throw new RuntimeException("Something went wrong...");
         }
     }

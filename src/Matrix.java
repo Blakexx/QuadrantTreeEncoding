@@ -10,12 +10,11 @@ public abstract class Matrix<E>{
 
     public abstract int height();
     public abstract int width();
-    public abstract int size();
+    public int size(){
+        return height() * width();
+    }
 
     public abstract E[][] toRawMatrix();
-
-    public abstract E[] getRow(int r, Class<E> type);
-    public abstract E[][] bulkGet(int r, int c, int height, int width, Class<E> type);
 
     public Iterator<DataPoint<E>> iterator(){
         return iterator(IteratorType.DEFAULT);

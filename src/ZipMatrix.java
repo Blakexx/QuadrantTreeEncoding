@@ -48,20 +48,8 @@ public class ZipMatrix<E> extends Matrix<E> {
         return width;
     }
 
-    public int size(){
-        return height()*width();
-    }
-
     public E[][] toRawMatrix(){
         return zipEncoder.decodeMatrix(encodedMatrix);
-    }
-
-    public E[] getRow(int r, Class<E> type) {
-        return null;
-    }
-
-    public E[][] bulkGet(int r, int c, int height, int width, Class<E> type) {
-        return null;
     }
 
     public Iterator<DataPoint<E>> iterator(int r, int c, int h, int w, IteratorType type){

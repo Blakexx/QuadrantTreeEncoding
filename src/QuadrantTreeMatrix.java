@@ -12,6 +12,7 @@ public class QuadrantTreeMatrix<E> extends Matrix<E>{
     private final BiFunction<Integer,Integer,byte[]> intEncoder;
     private final BiFunction<byte[],Integer,Integer> intDecoder;
     public final double cachePercent;
+    private final StandardHeader<E> header;
 
     public QuadrantTreeMatrix(MemoryController encodedMatrix, BiFunction<E,Integer,byte[]> bitEncoder, BiFunction<byte[],Integer,E> bitDecoder, double cachePercent){
         this.cachePercent = cachePercent;
@@ -20,6 +21,7 @@ public class QuadrantTreeMatrix<E> extends Matrix<E>{
         this.bitDecoder = bitDecoder;
         intEncoder = BitEncoders.intEncoder;
         intDecoder = BitEncoders.intDecoder;
+        header = new StandardHeader<>(encodedMatrix,bitDecoder);
         int height = height();
         int width = width();
         Quadrant baseFrame = new Quadrant(0,0,height,width);
@@ -27,7 +29,6 @@ public class QuadrantTreeMatrix<E> extends Matrix<E>{
         cacheQueue = new LinkedList<>();
         putIntoCache(baseFrame,0);
         trim();
-        nextRowInfo = getClosestIndexFromCache(0,0,false);
         Pair<Quadrant,Integer> info = getClosestIndexFromCache(0,0,true);
         info = decodeUntil(0,0,info);
         for(int c = 0; c<width; c++){
@@ -92,9 +93,9 @@ public class QuadrantTreeMatrix<E> extends Matrix<E>{
         Pair<Quadrant,Integer> frameInfo = decodeUntil(r,c,getClosestIndexFromCache(r,c,true));
         int dataIndex = frameInfo.value;
         Quadrant baseFrame = frameInfo.key;
-        if(!defaultItem().equals(data)){
+        if(!header.defaultItem.equals(data)){
             if(encodedMatrix.getBit(dataIndex)){
-                encodedMatrix.setBits(dataIndex+1,bitsPerData(),data,bitEncoder);
+                encodedMatrix.setBits(dataIndex+1,header.bitsPerData,data,bitEncoder);
             }else{
                 MemoryController toAdd = encodeChunk(frameInfo.key,r,c,data,dataIndex);
                 encodedMatrix.setBits(dataIndex+toAdd.size(),encodedMatrix.size()-dataIndex-1,encodedMatrix.getBits(dataIndex+1,encodedMatrix.size()-dataIndex-1));
@@ -111,7 +112,7 @@ public class QuadrantTreeMatrix<E> extends Matrix<E>{
             }
         }else{
             if(encodedMatrix.getBit(dataIndex)){
-                int removed = bitsPerData();
+                int removed = header.bitsPerData;
                 int deleteStart = dataIndex+1, deleteEnd = dataIndex+removed+1;
                 while(baseFrame.parent!=null){
                     baseFrame = baseFrame.parent;
@@ -150,7 +151,7 @@ public class QuadrantTreeMatrix<E> extends Matrix<E>{
     }
 
     public void printBits(){
-        System.out.println(encodedMatrix.bitToString(headerSize()));
+        System.out.println(encodedMatrix.bitToString(header.headerSize));
     }
 
     private boolean hasData(Quadrant frame, int ignore, int size, int parentIndex){
@@ -183,8 +184,8 @@ public class QuadrantTreeMatrix<E> extends Matrix<E>{
                 parentIndex = dataIndex;
                 writer.writeBit(true);
                 if(currentFrame.size()<=1){
-                    writer.writeBits(bitsPerData(),data,bitEncoder);
-                    dataIndex+=bitsPerData();
+                    writer.writeBits(header.bitsPerData,data,bitEncoder);
+                    dataIndex+=header.bitsPerData;
                 }
                 currentFrame = currentFrame.getNext();
             }else{
@@ -214,9 +215,9 @@ public class QuadrantTreeMatrix<E> extends Matrix<E>{
         int dataIndex = decodeUntil(r,c,getClosestIndexFromCache(r,c,true)).value;
         cacheQueue();
         if(dataIndex<encodedMatrix.size()&&encodedMatrix.getBit(dataIndex)){
-            return encodedMatrix.getBits(dataIndex+1,bitsPerData(),bitDecoder);
+            return encodedMatrix.getBits(dataIndex+1,header.bitsPerData,bitDecoder);
         }
-        return defaultItem();
+        return header.defaultItem;
     }
 
     private Pair<Quadrant,Integer> decodeUntil(int r, int c, Pair<Quadrant,Integer> frameInfo){
@@ -232,7 +233,7 @@ public class QuadrantTreeMatrix<E> extends Matrix<E>{
             }
             if(encodedMatrix.getBit(dataIndex)){
                 if(currentFrame.size()<=1){
-                    dataIndex+=bitsPerData();
+                    dataIndex+=header.bitsPerData;
                 }
                 currentFrame = currentFrame.getNext();
             }else{
@@ -252,7 +253,7 @@ public class QuadrantTreeMatrix<E> extends Matrix<E>{
         if(doCache){
             cacheQueue.add(new Pair<>(baseFrame,0));
         }
-        int dataIndex = headerSize();
+        int dataIndex = header.headerSize;
         while(true){
             Quadrant current = baseFrame.getChildContaining(r,c);
             int cacheIndex = getIndexFromCache(current,dataIndex);
@@ -311,105 +312,16 @@ public class QuadrantTreeMatrix<E> extends Matrix<E>{
         return getIndexFromCache(frame,parentIndex,false);
     }
 
-    public int bitsPerData(){
-        return encodedMatrix.getBits(0,8,intDecoder);
-    }
-
-    public E defaultItem(){
-        return encodedMatrix.getBits(8,bitsPerData(),bitDecoder);
-    }
-
-    private int bitsPerHeight(){
-        return encodedMatrix.getBits(8+bitsPerData(),5,intDecoder)+1;
-    }
-
     public int height(){
-        return encodedMatrix.getBits(8+bitsPerData()+5,bitsPerHeight(),intDecoder);
-    }
-
-    private int bitsPerWidth(){
-        return encodedMatrix.getBits(8+bitsPerData()+5+bitsPerHeight(),5,intDecoder)+1;
+        return header.height;
     }
 
     public int width(){
-        return encodedMatrix.getBits(8+bitsPerData()+5+bitsPerHeight()+5,bitsPerWidth(),intDecoder);
-    }
-
-    private int headerSize(){
-        return 8+bitsPerData()+5+bitsPerHeight()+5+bitsPerWidth();
-    }
-
-    public int size(){
-        return height()*width();
+        return header.width;
     }
 
     public E[][] toRawMatrix(){
         return QuadrantTreeEncoder.decodeMatrix(encodedMatrix,bitDecoder);
-    }
-
-    private int nextRow = 0;
-    private Pair<Quadrant,Integer> nextRowInfo;
-
-    public E[] getRow(int r, Class<E> type){
-        if(r<0||r>=height()){
-            throw new IllegalArgumentException("Invalid Dimensions");
-        }
-        E[] ret = bulkGet(r,0,1,width(),type,nextRow==r&&nextRowInfo!=null?nextRowInfo:getClosestIndexFromCache(r,0,false))[0];
-        nextRow++;
-        if(nextRow==height()){
-            nextRow = 0;
-            nextRowInfo = getClosestIndexFromCache(0,0,false);
-        }
-        return ret;
-    }
-
-    public E[][] bulkGet(int r, int c, int height, int width, Class<E> type){
-        Quadrant baseFrame = new Quadrant(0,0,height(),width());
-        Quadrant readFrame = new Quadrant(r,c,height,width);
-        if(!baseFrame.contains(readFrame)){
-            throw new IllegalArgumentException("Invalid Dimensions");
-        }
-        return bulkGet(r,c,height,width,type,getClosestIndexFromCache(r,c,false));
-    }
-
-    private E[][] bulkGet(int r, int c, int height, int width, Class<E> type,Pair<Quadrant,Integer> frameInfo){
-        Quadrant readFrame = new Quadrant(r,c,height,width);
-        E[][] container = (E[][])Array.newInstance(type,height,width);
-        Quadrant current = frameInfo.key;
-        int index = frameInfo.value;
-        int readCount = 0, toRead = height*width;
-        E defItem = defaultItem();
-        int bpd = bitsPerData();
-        while(readCount<toRead){
-            if(current.yPos==nextRow&&current.xPos==0){
-                nextRowInfo = new Pair<>(new Quadrant(current.yPos,current.xPos,current.height,current.width,current.parent,current.quadrant),index);
-            }
-            if(encodedMatrix.getBit(index)){
-                index++;
-                if(current.size()==1){
-                    int row = current.yPos, col = current.xPos;
-                    if(readFrame.contains(row,col)){
-                        E data = encodedMatrix.getBits(index,bpd,bitDecoder);
-                        container[row-r][col-c] = data;
-                        readCount++;
-                    }
-                    index+=bpd;
-                }
-                current = current.getNext();
-            }else{
-                index++;
-                int rStart = Math.max(r,current.yPos), rEnd = Math.min(r+height,current.yPos+current.height);
-                int cStart = Math.max(c,current.xPos), cEnd = Math.min(c+width,current.xPos+current.width);
-                readCount+=Math.max(0,(rEnd-rStart)*(cEnd-cStart));
-                for(;rStart<rEnd;rStart++){
-                    for(;cStart<cEnd;cStart++){
-                        container[rStart-r][cStart-c] = defItem;
-                    }
-                }
-                current = current.skipChildren();
-            }
-        }
-        return container;
     }
 
     public Iterator<DataPoint<E>> iterator(){
@@ -472,13 +384,13 @@ public class QuadrantTreeMatrix<E> extends Matrix<E>{
                     int dataC = prev.xPos+prevCount%prev.width;
                     if(readFrame.contains(dataR,dataC)){
                         readCount++;
-                        return new DataPoint<>(matrix.defaultItem(),dataR,dataC);
+                        return new DataPoint<>(matrix.header.defaultItem,dataR,dataC);
                     }
                 }else{
                     index++;
                     if(current.size()==1){
-                        V datum = data.getBits(index,matrix.bitsPerData(),matrix.bitDecoder);
-                        index+=matrix.bitsPerData();
+                        V datum = data.getBits(index,matrix.header.bitsPerData,matrix.bitDecoder);
+                        index+=matrix.header.bitsPerData;
                         Quadrant prev = current;
                         current = current.getNext();
                         if(readFrame.contains(prev)){

@@ -9,6 +9,7 @@ public class DirectMatrix<E> extends Matrix<E> {
     public final BiFunction<byte[],Integer,E> bitDecoder;
     private final BiFunction<Integer,Integer,byte[]> intEncoder;
     private final BiFunction<byte[],Integer,Integer> intDecoder;
+    private final StandardHeader<E> header;
 
     public DirectMatrix(MemoryController encodedMatrix, BiFunction<E,Integer,byte[]> bitEncoder, BiFunction<byte[],Integer,E> bitDecoder){
         this.encodedMatrix = encodedMatrix;
@@ -17,6 +18,7 @@ public class DirectMatrix<E> extends Matrix<E> {
         intEncoder = BitEncoders.intEncoder;
         intDecoder = BitEncoders.intDecoder;
         trim();
+        header = new StandardHeader<>(encodedMatrix,bitDecoder);
     }
 
     public DirectMatrix(E[][] matrix, int bitsPerData, BiFunction<E,Integer,byte[]> bitEncoder, BiFunction<byte[],Integer,E> bitDecoder){
@@ -47,10 +49,10 @@ public class DirectMatrix<E> extends Matrix<E> {
 
     public E get(int r, int c) {
         int rawIndex = width() * r + c;
-        int bpd = bitsPerData();
+        int bpd = header.bitsPerData;
         rawIndex *= bpd;
         return encodedMatrix.getBits(
-                headerSize()+rawIndex,
+                header.headerSize+rawIndex,
                 bpd,
                 bitDecoder
         );
@@ -60,32 +62,12 @@ public class DirectMatrix<E> extends Matrix<E> {
         return null; // Not supported
     }
 
-    public int bitsPerData(){
-        return encodedMatrix.getBits(0,8,intDecoder);
-    }
-
-    public E defaultItem(){
-        return encodedMatrix.getBits(8,bitsPerData(),bitDecoder);
-    }
-
-    private int bitsPerHeight(){
-        return encodedMatrix.getBits(8+bitsPerData(),5,intDecoder)+1;
-    }
-
     public int height(){
-        return encodedMatrix.getBits(8+bitsPerData()+5,bitsPerHeight(),intDecoder);
-    }
-
-    private int bitsPerWidth(){
-        return encodedMatrix.getBits(8+bitsPerData()+5+bitsPerHeight(),5,intDecoder)+1;
+        return header.height;
     }
 
     public int width(){
-        return encodedMatrix.getBits(8+bitsPerData()+5+bitsPerHeight()+5,bitsPerWidth(),intDecoder);
-    }
-
-    private int headerSize(){
-        return 8+bitsPerData()+5+bitsPerHeight()+5+bitsPerWidth();
+        return header.width;
     }
 
     public int size(){
@@ -94,14 +76,6 @@ public class DirectMatrix<E> extends Matrix<E> {
 
     public E[][] toRawMatrix(){
         return DirectEncoder.decodeMatrix(encodedMatrix,bitDecoder);
-    }
-
-    public E[] getRow(int r, Class<E> type) {
-        return null;
-    }
-
-    public E[][] bulkGet(int r, int c, int height, int width, Class<E> type) {
-        return null;
     }
 
     public Iterator<DataPoint<E>> iterator(int r, int c, int h, int w, IteratorType type){
