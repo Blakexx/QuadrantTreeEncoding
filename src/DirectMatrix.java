@@ -70,10 +70,6 @@ public class DirectMatrix<E> extends Matrix<E> {
         return header.width;
     }
 
-    public int size(){
-        return height()*width();
-    }
-
     public E[][] toRawMatrix(){
         return DirectEncoder.decodeMatrix(encodedMatrix,bitDecoder);
     }

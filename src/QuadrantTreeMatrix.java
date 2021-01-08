@@ -324,14 +324,6 @@ public class QuadrantTreeMatrix<E> extends Matrix<E>{
         return QuadrantTreeEncoder.decodeMatrix(encodedMatrix,bitDecoder);
     }
 
-    public Iterator<DataPoint<E>> iterator(){
-        return iterator(IteratorType.DEFAULT);
-    }
-
-    public Iterator<DataPoint<E>> iterator(IteratorType type){
-        return iterator(0,0,height(),width(),type);
-    }
-
     public Iterator<DataPoint<E>> iterator(int r, int c, int h, int w, IteratorType type){
         Quadrant toIterate = new Quadrant(r,c,h,w);
         if(type==IteratorType.DEFAULT){
@@ -371,9 +363,8 @@ public class QuadrantTreeMatrix<E> extends Matrix<E>{
             }
             MemoryController data = matrix.encodedMatrix;
             while(true){
-                if(index>=data.size()||!data.getBit(index)){
-                    int prevCount = defaultsRead;
-                    defaultsRead++;
+                if(index>=data.size() || defaultsRead > 0 || !data.getBit(index)){
+                    int prevCount = defaultsRead++;
                     Quadrant prev = current;
                     if(defaultsRead==current.size()){
                         defaultsRead = 0;

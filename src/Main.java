@@ -164,7 +164,7 @@ public class Main {
         data.append(header);
         data.append("\n");
         System.out.println(header);
-        for(int dim = 16; dim <= 1024;dim *= 2){
+        for(int dim = 64; dim <= 1024;dim *= 2){
             runTests(toRun,dim,.3,cachePercent,type,onDisk,data);
         }
         System.out.println("\nFullness Test:");
